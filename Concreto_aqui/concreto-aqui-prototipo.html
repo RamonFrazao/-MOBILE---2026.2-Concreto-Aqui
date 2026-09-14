@@ -1,0 +1,896 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Concreto Aqui — Protótipo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#1E2A38;
+    --ink-soft:#48586E;
+    --paper:#E7E7E1;
+    --frame:#FBFBF9;
+    --line:#D7D8D0;
+    --line-soft:#E7E7E1;
+    --green:#3F7D5C;
+    --green-soft:#E1EEE6;
+    --red:#A8402F;
+    --red-soft:#F5E2DE;
+    --amber:#AD7A28;
+    --amber-soft:#F2E6CC;
+    --sans:'IBM Plex Sans', system-ui, sans-serif;
+    --mono:'IBM Plex Mono', ui-monospace, monospace;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:var(--sans);
+    color:var(--ink);
+    background:
+      linear-gradient(var(--paper),var(--paper)),
+      repeating-linear-gradient(0deg, rgba(30,42,56,0.05) 0 1px, transparent 1px 88px),
+      repeating-linear-gradient(90deg, rgba(30,42,56,0.05) 0 1px, transparent 1px 88px);
+    min-height:100vh;
+    display:flex;
+    align-items:flex-start;
+    justify-content:center;
+    padding:40px 16px;
+  }
+  .device{
+    width:390px;
+    height:800px;
+    background:var(--frame);
+    border-radius:34px;
+    border:1px solid #cfd0c8;
+    box-shadow:0 30px 60px -20px rgba(20,26,34,0.35), 0 2px 0 rgba(255,255,255,0.6) inset;
+    overflow:hidden;
+    position:relative;
+    display:flex;
+    flex-direction:column;
+  }
+  .screen{
+    display:flex;
+    flex-direction:column;
+    height:100%;
+  }
+  .statusbar{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    font-family:var(--mono);
+    font-size:11px;
+    letter-spacing:0.02em;
+    color:var(--ink-soft);
+    padding:10px 18px 0 18px;
+  }
+  .net{position:relative;padding-left:2px;}
+  .net-off{color:var(--red);}
+  .topbar{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:10px 14px 14px 14px;
+    border-bottom:1px solid var(--line-soft);
+    background:var(--accent, var(--ink));
+    color:#fff;
+  }
+  .topbar h1{
+    font-size:15px;
+    font-weight:600;
+    margin:0;
+    flex:1;
+    letter-spacing:0.01em;
+  }
+  .topbar button.back{
+    background:rgba(255,255,255,0.14);
+    border:none;
+    color:#fff;
+    width:30px;height:30px;
+    border-radius:9px;
+    font-size:15px;
+    cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .topbar .back-spacer{width:30px;}
+  .topbar .logout{
+    background:rgba(255,255,255,0.14);
+    border:none;color:#fff;
+    font-family:var(--sans);
+    font-size:12px;
+    padding:6px 10px;
+    border-radius:9px;
+    cursor:pointer;
+  }
+  .content{
+    flex:1;
+    overflow-y:auto;
+    padding:16px 16px 18px 16px;
+    background:var(--frame);
+  }
+  .footer{
+    padding:12px 16px 20px 16px;
+    border-top:1px solid var(--line-soft);
+    background:var(--frame);
+  }
+  /* ---- login ---- */
+  .login{
+    height:100%;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    padding:34px 26px;
+    background:linear-gradient(180deg,#1E2A38 0%, #23324430 40%, var(--frame) 40%);
+  }
+  .login-brand{color:#fff;margin-bottom:26px;}
+  .logo-mark{
+    width:42px;height:42px;border-radius:11px;
+    background:#fff;color:var(--ink);
+    display:flex;align-items:center;justify-content:center;
+    font-family:var(--mono);font-weight:600;font-size:15px;
+    margin-bottom:14px;
+  }
+  .login-brand h1{font-size:22px;margin:0 0 6px 0;}
+  .login-brand p{font-size:13px;line-height:1.5;color:#D7DCE3;margin:0;max-width:270px;}
+  .role-list{display:flex;flex-direction:column;gap:10px;}
+  .role-card{
+    text-align:left;
+    background:#fff;
+    border:1px solid var(--line);
+    border-left:4px solid var(--accent);
+    border-radius:12px;
+    padding:13px 14px;
+    cursor:pointer;
+    display:flex;flex-direction:column;gap:2px;
+    font-family:var(--sans);
+  }
+  .role-name{font-size:14px;font-weight:600;color:var(--ink);}
+  .role-pessoa{font-size:11.5px;font-family:var(--mono);color:var(--accent);}
+  .role-desc{font-size:12px;color:var(--ink-soft);margin-top:3px;line-height:1.4;}
+  .login-hint{color:var(--ink-soft);font-size:11.5px;text-align:center;margin-top:18px;}
+
+  /* ---- generic list menu ---- */
+  .menu{display:flex;flex-direction:column;gap:8px;}
+  .menu-row{
+    display:flex;align-items:center;gap:10px;
+    background:#fff;border:1px solid var(--line);border-radius:11px;
+    padding:12px 13px;cursor:pointer;text-align:left;width:100%;font-family:var(--sans);
+  }
+  .menu-row .txt{flex:1;}
+  .menu-row .title{font-size:13.5px;font-weight:600;color:var(--ink);}
+  .menu-row .hint{font-size:11.5px;color:var(--ink-soft);margin-top:2px;}
+  .menu-row .chev{color:var(--ink-soft);font-size:14px;}
+  .section-label{
+    font-size:11px;color:var(--ink-soft);font-weight:600;
+    margin:16px 0 8px 0;letter-spacing:0.02em;
+  }
+  .section-label:first-child{margin-top:0;}
+
+  /* ---- cards / readouts ---- */
+  .card{
+    background:#fff;border:1px solid var(--line);border-radius:12px;
+    padding:13px 14px;margin-bottom:10px;
+  }
+  .readout{
+    font-family:var(--mono);
+    background:#161F29;color:#EDEFEA;
+    border-radius:10px;padding:11px 13px;margin-bottom:10px;
+  }
+  .readout .rline{
+    display:flex;justify-content:space-between;
+    font-size:12.5px;padding:4px 0;
+    border-bottom:1px solid rgba(255,255,255,0.09);
+  }
+  .readout .rline:last-child{border-bottom:none;}
+  .readout .rline .k{color:#9AA6B4;}
+  .readout .rline .v{font-weight:600;}
+  .kv{display:flex;justify-content:space-between;font-size:13px;padding:6px 0;border-bottom:1px solid var(--line-soft);}
+  .kv:last-child{border-bottom:none;}
+  .kv .k{color:var(--ink-soft);}
+  .kv .v{font-weight:600;font-family:var(--mono);}
+  p.note{font-size:12.5px;color:var(--ink-soft);line-height:1.5;margin:8px 0 0 0;}
+  .badge{
+    display:inline-block;font-size:11px;font-weight:600;
+    padding:3px 9px;border-radius:999px;font-family:var(--sans);
+  }
+  .st-wait{background:#EDEEE8;color:var(--ink-soft);}
+  .st-amber{background:var(--amber-soft);color:var(--amber);}
+  .st-green{background:var(--green-soft);color:var(--green);}
+  .st-red{background:var(--red-soft);color:var(--red);}
+  .banner{
+    border-radius:11px;padding:12px 13px;margin-bottom:12px;font-size:13px;line-height:1.5;
+  }
+  .banner.green{background:var(--green-soft);color:#245A3E;}
+  .banner.red{background:var(--red-soft);color:#7C3020;}
+  .banner.amber{background:var(--amber-soft);color:#7A551A;}
+  .banner strong{display:block;font-size:13.5px;margin-bottom:2px;}
+
+  /* ---- buttons / forms ---- */
+  .btn{
+    width:100%;border:none;border-radius:11px;
+    padding:13px 14px;font-family:var(--sans);font-size:14px;font-weight:600;
+    cursor:pointer;
+  }
+  .btn-primary{background:var(--ink);color:#fff;}
+  .btn-danger{background:var(--red);color:#fff;}
+  .btn-ghost{background:#EEEEE8;color:var(--ink);}
+  .field{margin-bottom:12px;}
+  .field label{display:block;font-size:11.5px;color:var(--ink-soft);margin-bottom:5px;font-weight:600;}
+  .field input, .field select{
+    width:100%;border:1px solid var(--line);border-radius:9px;
+    padding:10px 11px;font-family:var(--mono);font-size:13.5px;background:#fff;color:var(--ink);
+  }
+  .cp-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px;}
+  .cp-slot{border:1px solid var(--line);border-radius:9px;padding:9px 10px;background:#fff;}
+  .cp-slot .lbl{font-size:10.5px;color:var(--ink-soft);margin-bottom:5px;}
+  .cp-slot input{width:100%;border:1px solid var(--line);border-radius:7px;padding:7px 8px;font-family:var(--mono);font-size:13px;}
+  .cp-slot .done{font-family:var(--mono);font-size:15px;font-weight:600;}
+  .timer-wrap{text-align:center;padding:14px 0 6px 0;}
+  .timer-num{font-family:var(--mono);font-size:40px;font-weight:600;letter-spacing:0.01em;}
+  .timer-bar{height:8px;background:#EBEBE4;border-radius:999px;overflow:hidden;margin:14px 0 6px 0;}
+  .timer-bar .fill{height:100%;background:var(--amber);width:100%;transition:width 1s linear, background 0.3s;}
+  .empty{
+    text-align:center;color:var(--ink-soft);font-size:12.5px;
+    padding:26px 10px;border:1px dashed var(--line);border-radius:11px;
+  }
+  .addbox{border:1px dashed var(--line);border-radius:11px;padding:12px;margin-top:10px;}
+  .addbox summary{font-size:12.5px;font-weight:600;color:var(--ink-soft);cursor:pointer;}
+  @media (max-width:640px){
+    body{padding:0;}
+    .device{width:100%;height:100vh;border-radius:0;border:none;box-shadow:none;}
+  }
+</style>
+</head>
+<body>
+<div class="device"><div id="app"></div></div>
+
+<script>
+/* ---------------------------- dados ---------------------------- */
+const DB = {
+  classes: [
+    { id:'c25', nome:'C25', fck:25, abatimento:'100 ± 20 mm', agregado:'19 mm' },
+    { id:'c30', nome:'C30', fck:30, abatimento:'90 ± 20 mm', agregado:'19 mm' }
+  ],
+  obra: {
+    nome:'Residencial Bom Conselho',
+    pavimentos:[
+      { nome:'3º pavimento', pecas:['Pilares P1 a P12','Laje do 2º pavimento L-201'] }
+    ]
+  },
+  usuarios: [
+    { usuario:'construtora', senha:'1234', role:'construtora', nome:'Escritório técnico', construtora:'Construtora Bom Conselho' },
+    { usuario:'tecnico', senha:'1234', role:'obra', nome:'Técnico no canteiro' },
+    { usuario:'lab', senha:'1234', role:'laboratorio', nome:'Laboratorista' }
+  ],
+  centrais: [ { nome:'Central Concrelama', ref:'BR-232, km 12' } ],
+  laboratorios: [ { nome:'Laboratório UAST' } ],
+  lotes: [
+    { id:'l1', numero:'12/03', peca:'Pilares do 3º pavimento', classeId:'c25', volume:8,
+      caminhoesPlanejados:4, status:'aceito',
+      caminhoes:[ { placa:'QRZ-4C18', nota:'45.812', horaContato:'08:05', statusCaminhao:'aceito' } ],
+      amostras:[ { peca:'Pilar P7', identificacao:'CP-2026-0418',
+        cps:[ {idade:7,resultado:19.8}, {idade:7,resultado:20.1}, {idade:28,resultado:27.4}, {idade:28,resultado:26.1} ] } ],
+      exemplaresTotal:6, fckEstHistorico:26.2
+    },
+    { id:'l2', numero:'14/03', peca:'Laje do 2º pavimento L-201', classeId:'c25', volume:6,
+      caminhoesPlanejados:1, status:'aguardando_caminhao',
+      caminhoes:[], amostras:[] }
+  ]
+};
+
+/* ---------------------------- estado ---------------------------- */
+let state = { screen:'login', stack:[], role:null, user:null, ctx:{}, loginError:null };
+let countdownTimer = null;
+
+function stopCountdown(){ if(countdownTimer){ clearInterval(countdownTimer); countdownTimer=null; } }
+function navigate(screen, ctx){
+  ctx = ctx || {};
+  stopCountdown();
+  state.stack.push({ screen: state.screen, ctx: state.ctx });
+  state.screen = screen;
+  state.ctx = Object.assign({}, state.ctx, ctx);
+  render();
+}
+function goBack(){
+  stopCountdown();
+  const prev = state.stack.pop();
+  if(prev){ state.screen = prev.screen; state.ctx = prev.ctx; render(); }
+}
+function logout(){ stopCountdown(); state = { screen:'login', stack:[], role:null, user:null, ctx:{}, loginError:null }; render(); }
+function tryLogin(){
+  const u = (document.getElementById('login-user').value || '').trim();
+  const p = (document.getElementById('login-pass').value || '').trim();
+  // Em produção, isto é uma chamada à API: a senha nunca é comparada no aparelho,
+  // e a API sempre responde com a mesma mensagem genérica em caso de falha.
+  const match = DB.usuarios.find(function(x){ return x.usuario === u && x.senha === p; });
+  if(match){
+    state.user = match;
+    state.role = match.role;
+    state.stack = [];
+    state.ctx = {};
+    state.loginError = null;
+    state.screen = 'home-' + match.role;
+  } else {
+    state.loginError = 'Usuário ou senha inválidos.';
+  }
+  render();
+}
+window.trySubmitLogin = tryLogin;
+function sessionLine(){
+  if(!state.user) return '';
+  return `<p class="note" style="margin-bottom:14px">Sessão: <strong style="color:var(--ink)">${state.user.nome}</strong>${state.user.construtora ? ' · '+state.user.construtora : ''} — guardada no aparelho, sem pedir login de novo.</p>`;
+}
+
+function loteById(id){ return DB.lotes.find(l=>l.id===id); }
+function classeById(id){ return DB.classes.find(c=>c.id===id); }
+function statusInfo(s){
+  return ({
+    aguardando_caminhao:{label:'Aguardando caminhão', cls:'st-wait'},
+    aguardando_resultados:{label:'Aguardando resultados', cls:'st-wait'},
+    aguardando_aceitacao:{label:'Aguardando aceitação', cls:'st-amber'},
+    aceito:{label:'Aceito', cls:'st-green'},
+    reprovado:{label:'Reprovado', cls:'st-red'}
+  })[s] || {label:s, cls:'st-wait'};
+}
+function exemplarValor(cps, idade){
+  const vals = cps.filter(c=>c.idade===idade && c.resultado!=null).map(c=>c.resultado);
+  if(vals.length < 2) return null;
+  return Math.max.apply(null, vals);
+}
+function calcFckEst(exemplares){
+  const vals = exemplares.slice().sort((a,b)=>a-b);
+  const n = vals.length;
+  if(n===0) return null;
+  if(n===1) return vals[0];
+  const m = Math.max(1, Math.floor(n/2));
+  const media = vals.slice(0,m).reduce((a,b)=>a+b,0)/m;
+  return Math.round((2*media - vals[0])*10)/10;
+}
+
+/* ---------------------------- casca de tela ---------------------------- */
+function shell(opts){
+  const accent = opts.accent, network = opts.network || 'online', title = opts.title, body = opts.body, footer = opts.footer;
+  const isHome = state.stack.length === 0;
+  return `
+    <div class="screen">
+      <div class="statusbar">
+        <span class="time">09:14</span>
+        <span class="net ${network==='offline'?'net-off':''}">${network==='offline' ? '● sem rede' : '● online'}</span>
+      </div>
+      <div class="topbar" style="--accent:${accent}">
+        ${isHome
+          ? `<button class="logout" data-action="logout">Sair</button>`
+          : `<button class="back" data-action="back" aria-label="Voltar">←</button>`}
+        <h1>${title}</h1>
+        <span class="back-spacer"></span>
+      </div>
+      <div class="content">${body}</div>
+      ${footer ? `<div class="footer">${footer}</div>` : ''}
+    </div>`;
+}
+function menuRow(to, title, hint, ctx){
+  return `
+    <button class="menu-row" data-action="nav" data-to="${to}" ${ctx?`data-ctx='${JSON.stringify(ctx)}'`:''}>
+      <span class="txt"><span class="title">${title}</span><span class="hint">${hint}</span></span>
+      <span class="chev">›</span>
+    </button>`;
+}
+
+/* ---------------------------- telas: login ---------------------------- */
+function screenLogin(){
+  const err = state.loginError
+    ? `<div class="banner red" style="margin-top:2px"><strong>Não foi possível entrar</strong>${state.loginError}</div>`
+    : '';
+  return `
+    <div class="login">
+      <div class="login-brand">
+        <div class="logo-mark">CA</div>
+        <h1>Concreto Aqui</h1>
+        <p>Controle tecnológico do concreto — do caminhão que chega à aceitação do lote.</p>
+      </div>
+      <div class="field">
+        <label>Usuário</label>
+        <input id="login-user" placeholder="usuário" autocomplete="username" style="font-family:var(--sans)" />
+      </div>
+      <div class="field">
+        <label>Senha</label>
+        <input id="login-pass" type="password" placeholder="senha" autocomplete="current-password"
+          style="font-family:var(--sans)"
+          onkeydown="if(event.key==='Enter'){ window.trySubmitLogin(); }" />
+      </div>
+      ${err}
+      <button class="btn btn-primary" data-action="submit-login">Entrar</button>
+      <p class="login-hint">A senha é conferida no servidor, nunca no aparelho — e o erro não diz se o usuário existe ou se foi a senha.</p>
+      <p class="login-hint" style="margin-top:16px">Perfis de teste do protótipo: <strong>construtora</strong> · <strong>tecnico</strong> · <strong>lab</strong> — senha <strong>1234</strong></p>
+    </div>`;
+}
+
+/* ---------------------------- construtora ---------------------------- */
+function screenHomeConstrutora(){
+  const pendentes = DB.lotes.filter(l=>l.status==='aguardando_aceitacao').length;
+  const body = `
+    ${sessionLine()}
+    <div class="menu">
+      ${menuRow('c-obras','Obras e peças','Pavimentos e peças de destino')}
+      ${menuRow('c-cadastros','Centrais e laboratórios','Cadastro de fornecedores')}
+      ${menuRow('c-classes','Classes de concreto','fck, abatimento, agregado')}
+      ${menuRow('c-lotes','Pedidos e lotes', DB.lotes.length + ' registrados')}
+      ${menuRow('c-aceitacao','Aceitação de lotes', pendentes>0 ? pendentes+' aguardando decisão' : 'nenhum pendente')}
+    </div>`;
+  return shell({ accent:'#1E2A38', title:'Construtora', body:body });
+}
+function screenObrasPecas(){
+  const p = DB.obra.pavimentos[0];
+  const body = `
+    <div class="card">
+      <div class="kv"><span class="k">Obra</span><span class="v" style="font-family:var(--sans)">${DB.obra.nome}</span></div>
+      <div class="kv"><span class="k">Pavimento</span><span class="v" style="font-family:var(--sans)">${p.nome}</span></div>
+    </div>
+    <div class="section-label">Peças cadastradas</div>
+    <div class="menu">
+      ${p.pecas.map(pc=>`<div class="menu-row" style="cursor:default"><span class="txt"><span class="title">${pc}</span></span></div>`).join('')}
+    </div>
+    <details class="addbox">
+      <summary>+ Adicionar peça</summary>
+      <div class="field" style="margin-top:10px"><label>Nome da peça</label><input id="nova-peca" placeholder="ex.: Viga V-04" /></div>
+      <button class="btn btn-primary" data-action="add-peca">Adicionar</button>
+    </details>`;
+  return shell({ accent:'#1E2A38', title:'Obras e peças', body:body });
+}
+function screenCadastros(){
+  const body = `
+    <div class="section-label">Centrais</div>
+    <div class="menu">${DB.centrais.map(c=>`<div class="menu-row" style="cursor:default"><span class="txt"><span class="title">${c.nome}</span><span class="hint">${c.ref}</span></span></div>`).join('')}</div>
+    <div class="section-label">Laboratórios</div>
+    <div class="menu">${DB.laboratorios.map(c=>`<div class="menu-row" style="cursor:default"><span class="txt"><span class="title">${c.nome}</span></span></div>`).join('')}</div>
+    <p class="note">A central de concreto é apenas cadastro — não tem acesso ao aplicativo.</p>`;
+  return shell({ accent:'#1E2A38', title:'Centrais e laboratórios', body:body });
+}
+function screenClasses(){
+  const body = `
+    <div class="menu">
+      ${DB.classes.map(c=>`
+        <div class="card">
+          <div class="kv"><span class="k">Classe</span><span class="v">${c.nome} · ${c.fck} MPa</span></div>
+          <div class="kv"><span class="k">Abatimento</span><span class="v">${c.abatimento}</span></div>
+          <div class="kv"><span class="k">Agregado</span><span class="v">${c.agregado}</span></div>
+        </div>`).join('')}
+    </div>
+    <details class="addbox">
+      <summary>+ Nova classe</summary>
+      <div class="field" style="margin-top:10px"><label>Nome</label><input id="nc-nome" placeholder="ex.: C35" /></div>
+      <div class="field"><label>fck de projeto (MPa)</label><input id="nc-fck" placeholder="35" /></div>
+      <div class="field"><label>Abatimento</label><input id="nc-abat" placeholder="80 ± 20 mm" /></div>
+      <button class="btn btn-primary" data-action="add-classe">Adicionar classe</button>
+    </details>`;
+  return shell({ accent:'#1E2A38', title:'Classes de concreto', body:body });
+}
+function screenLotes(){
+  const rows = DB.lotes.map(l=>{
+    const st = statusInfo(l.status);
+    return `
+      <button class="menu-row" data-action="nav" data-to="c-lote-detalhe" data-ctx='{"loteId":"${l.id}"}'>
+        <span class="txt"><span class="title">Lote ${l.numero} · ${l.peca}</span>
+        <span class="hint">${classeById(l.classeId).nome} · ${l.volume} m³</span></span>
+        <span class="badge ${st.cls}">${st.label}</span>
+      </button>`;
+  }).join('');
+  const body = `<div class="menu">${rows}</div>
+    <details class="addbox">
+      <summary>+ Novo pedido</summary>
+      <div class="field" style="margin-top:10px"><label>Número do lote</label><input id="np-numero" placeholder="ex.: 20/03" /></div>
+      <div class="field"><label>Peça de destino</label><input id="np-peca" placeholder="ex.: Viga V-04" /></div>
+      <div class="field"><label>Volume (m³)</label><input id="np-volume" placeholder="6" /></div>
+      <button class="btn btn-primary" data-action="add-pedido">Abrir lote</button>
+    </details>
+    <details class="addbox" style="margin-top:10px">
+      <summary>Buscar lote por código</summary>
+      <div class="field" style="margin-top:10px"><label>Código do lote</label><input id="busca-lote-input" placeholder="ex.: 19/07" /></div>
+      <button class="btn btn-ghost" data-action="buscar-lote">Buscar</button>
+      <div id="busca-lote-resultado"></div>
+      <p class="note">Tente um código que não é seu, como <strong>19/07</strong>, para ver o que a API responde.</p>
+    </details>`;
+  return shell({ accent:'#1E2A38', title:'Pedidos e lotes', body:body });
+}
+function screenLoteDetalhe(){
+  const l = loteById(state.ctx.loteId);
+  const cl = classeById(l.classeId);
+  const st = statusInfo(l.status);
+  let corpo = '';
+  if(l.id==='l1'){
+    corpo = `
+      <div class="readout">
+        <div class="rline"><span class="k">Exemplares</span><span class="v">${l.exemplaresTotal}</span></div>
+        <div class="rline"><span class="k">fck de projeto</span><span class="v">${cl.fck} MPa</span></div>
+        <div class="rline"><span class="k">fck,est</span><span class="v">${l.fckEstHistorico} MPa</span></div>
+      </div>
+      <p class="note">Amostra de referência: ${l.amostras[0].identificacao} (${l.amostras[0].peca}) — 28 dias: 27,4 e 26,1 MPa.</p>`;
+  } else if(l.caminhoes.length){
+    corpo = `<p class="note">Aguardando o técnico da obra concluir o recebimento do caminhão e a moldagem dos corpos de prova.</p>`;
+  } else {
+    corpo = `<p class="note">Aguardando o técnico da obra registrar a chegada do caminhão. A construtora não executa etapas de campo.</p>`;
+  }
+  const body = `
+    <div class="card">
+      <div class="kv"><span class="k">Lote</span><span class="v" style="font-family:var(--sans)">${l.numero}</span></div>
+      <div class="kv"><span class="k">Peça</span><span class="v" style="font-family:var(--sans)">${l.peca}</span></div>
+      <div class="kv"><span class="k">Classe</span><span class="v">${cl.nome} · ${cl.fck} MPa</span></div>
+      <div class="kv"><span class="k">Volume</span><span class="v">${l.volume} m³</span></div>
+      <div class="kv"><span class="k">Status</span><span class="badge ${st.cls}">${st.label}</span></div>
+    </div>
+    ${corpo}`;
+  return shell({ accent:'#1E2A38', title:'Lote '+l.numero, body:body });
+}
+function screenAceitacao(){
+  const pend = DB.lotes.filter(l=>l.status==='aguardando_aceitacao');
+  const decididos = DB.lotes.filter(l=>l.status==='aceito'||l.status==='reprovado');
+  const body = `
+    <div class="section-label">Aguardando decisão</div>
+    ${pend.length ? `<div class="menu">${pend.map(l=>menuRow('c-aceitacao-detalhe','Lote '+l.numero, l.peca, {loteId:l.id})).join('')}</div>`
+      : `<div class="empty">Nenhum lote aguardando aceitação no momento.</div>`}
+    <div class="section-label">Histórico</div>
+    <div class="menu">${decididos.map(l=>menuRow('c-lote-detalhe','Lote '+l.numero, l.peca, {loteId:l.id})).join('')}</div>`;
+  return shell({ accent:'#1E2A38', title:'Aceitação de lotes', body:body });
+}
+function screenAceitacaoDetalhe(){
+  const l = loteById(state.ctx.loteId);
+  const cl = classeById(l.classeId);
+  const exemplares28 = [];
+  l.amostras.forEach(am=>{ const e = exemplarValor(am.cps,28); if(e!=null) exemplares28.push(e); });
+  const fckEst = calcFckEst(exemplares28);
+  const aceito = fckEst!=null && fckEst >= cl.fck;
+  const body = `
+    <div class="readout">
+      <div class="rline"><span class="k">Exemplares (28 dias)</span><span class="v">${exemplares28.length}</span></div>
+      <div class="rline"><span class="k">fck de projeto</span><span class="v">${cl.fck} MPa</span></div>
+      <div class="rline"><span class="k">fck,est</span><span class="v">${fckEst!=null?fckEst+' MPa':'—'}</span></div>
+    </div>
+    <div class="banner ${aceito?'green':'red'}">
+      <strong>${aceito ? 'Lote aceito' : 'Lote reprovado'}</strong>
+      fck,est ${aceito?'igual ou acima':'abaixo'} do fck de projeto (${cl.fck} MPa).
+    </div>
+    <p class="note">Cálculo simplificado para fins de protótipo (a regra completa da NBR 12655 varia conforme o número de exemplares). O sistema calcula — a construtora só registra a decisão.</p>`;
+  const footer = `<button class="btn ${aceito?'btn-primary':'btn-danger'}" data-action="decidir-aceitacao">Registrar ${aceito?'aceitação':'reprovação'}</button>`;
+  return shell({ accent:'#1E2A38', title:'Lote '+l.numero, body:body, footer:footer });
+}
+
+/* ---------------------------- obra ---------------------------- */
+function screenHomeObra(){
+  const abertos = DB.lotes.filter(l=>l.status==='aguardando_caminhao').length;
+  const body = `
+    ${sessionLine()}
+    <div class="menu">
+      ${menuRow('o-lotes','Caminhões a receber', abertos+' lote(s) aguardando')}
+    </div>
+    <p class="note">O técnico da obra recebe o caminhão, confere a nota, faz o ensaio de abatimento, molda os corpos de prova e envia ao laboratório. Não altera resultado de ensaio — isso é só do laboratório.</p>`;
+  return shell({ accent:'#AD7A28', network:'offline', title:'Obra', body:body });
+}
+function screenObraLotes(){
+  const rows = DB.lotes.filter(l=>l.status==='aguardando_caminhao')
+    .map(l=>menuRow('o-chegada', 'Lote '+l.numero, l.peca+' · '+classeById(l.classeId).nome, {loteId:l.id}))
+    .join('');
+  const body = rows ? `<div class="menu">${rows}</div>` : `<div class="empty">Nenhum caminhão aguardado no momento.</div>`;
+  return shell({ accent:'#AD7A28', network:'offline', title:'Caminhões a receber', body:body });
+}
+function screenChegada(){
+  const l = loteById(state.ctx.loteId);
+  const cl = classeById(l.classeId);
+  const body = `
+    <div class="readout">
+      <div class="rline"><span class="k">Nota</span><span class="v">45.820</span></div>
+      <div class="rline"><span class="k">Placa</span><span class="v">QRZ-4C18</span></div>
+      <div class="rline"><span class="k">Cimento + água</span><span class="v">08:05</span></div>
+      <div class="rline"><span class="k">Classe na nota</span><span class="v">C20</span></div>
+    </div>
+    <div class="banner amber">
+      <strong>Divergência</strong>
+      Nota veio C20; o pedido do lote ${l.numero} era ${cl.nome}. Fica registrado — não é corrigido no canteiro.
+    </div>
+    <div class="card">
+      <div class="kv"><span class="k">Pedido</span><span class="v" style="font-family:var(--sans)">${cl.nome} · ${cl.fck} MPa</span></div>
+      <div class="kv"><span class="k">Peça de destino</span><span class="v" style="font-family:var(--sans)">${l.peca}</span></div>
+    </div>`;
+  const footer = `<button class="btn btn-primary" data-action="confirmar-chegada">Confirmar chegada e iniciar prazo</button>`;
+  return shell({ accent:'#AD7A28', network:'offline', title:'Nota de entrega', body:body, footer:footer });
+}
+function screenJanela90(){
+  const l = loteById(state.ctx.loteId);
+  const body = `
+    <div class="card">
+      <div class="kv"><span class="k">Lote</span><span class="v" style="font-family:var(--sans)">${l.numero}</span></div>
+      <div class="kv"><span class="k">Primeiro contato</span><span class="v">08:05</span></div>
+      <div class="kv"><span class="k">Prazo</span><span class="v">90 min</span></div>
+    </div>
+    <div class="timer-wrap">
+      <div class="timer-num" id="cd-time">21:00</div>
+      <div class="timer-bar"><div class="fill" id="cd-bar"></div></div>
+      <div id="cd-msg" class="note">Restam 21 minutos para terminar a descarga.</div>
+    </div>
+    <p class="note">O prazo estourado fica marcado no registro — não é apagado, mesmo que a descarga continue.</p>`;
+  const footer = `<button class="btn btn-primary" data-action="nav" data-to="o-slump" data-ctx='{"loteId":"${l.id}"}'>Ir para o ensaio de abatimento</button>`;
+  return shell({ accent:'#AD7A28', network:'offline', title:'Janela de 90 minutos', body:body, footer:footer });
+}
+function startCountdown(){
+  const totalStart = 21*60;
+  let remaining = totalStart;
+  const timeEl = document.getElementById('cd-time');
+  const barEl = document.getElementById('cd-bar');
+  const msgEl = document.getElementById('cd-msg');
+  if(!timeEl) return;
+  function paint(){
+    const m = Math.max(0,Math.floor(remaining/60));
+    const s = Math.max(0,remaining%60);
+    timeEl.textContent = String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
+    const pct = Math.max(0, (remaining/totalStart)*100);
+    barEl.style.width = pct+'%';
+    if(remaining<=0){
+      timeEl.style.color = 'var(--red)';
+      barEl.style.background = 'var(--red)';
+      msgEl.textContent = 'Prazo estourado. Fica marcado, não apagado.';
+    } else if(remaining < totalStart*0.25){
+      barEl.style.background = 'var(--red)';
+      msgEl.textContent = 'Restam '+m+' min '+s+' s — quase no limite.';
+    } else {
+      msgEl.textContent = 'Restam '+m+' minutos para terminar a descarga.';
+    }
+  }
+  paint();
+  countdownTimer = setInterval(function(){
+    remaining -= 1;
+    if(remaining < 0){ clearInterval(countdownTimer); countdownTimer=null; remaining=0; paint(); return; }
+    paint();
+  }, 1000);
+}
+function screenSlump(){
+  const l = loteById(state.ctx.loteId);
+  const cl = classeById(l.classeId);
+  const body = `
+    <div class="card">
+      <div class="kv"><span class="k">Pedido</span><span class="v">${cl.abatimento}</span></div>
+    </div>
+    <div class="field"><label>Abatimento medido (mm)</label><input id="slump-valor" inputmode="numeric" placeholder="ex.: 95" oninput="onSlumpInput()" /></div>
+    <div id="slump-resultado"></div>
+    <p class="note">Fora da tolerância, o caminhão volta para a central — não se corrige com água no canteiro.</p>`;
+  const footer = `<button class="btn btn-primary" id="slump-btn" data-action="confirmar-slump" data-loteid="${l.id}" disabled>Confirmar leitura</button>`;
+  return shell({ accent:'#AD7A28', network:'offline', title:'Ensaio de abatimento', body:body, footer:footer });
+}
+function slumpTolerance(cl){
+  const m = cl.abatimento.match(/(\d+)\s*±\s*(\d+)/);
+  if(!m) return {min:0,max:9999,alvo:0,tol:0};
+  const alvo = parseInt(m[1],10), tol = parseInt(m[2],10);
+  return { min: alvo-tol, max: alvo+tol, alvo:alvo, tol:tol };
+}
+window.onSlumpInput = function(){
+  const l = loteById(state.ctx.loteId);
+  const cl = classeById(l.classeId);
+  const t = slumpTolerance(cl);
+  const input = document.getElementById('slump-valor');
+  const out = document.getElementById('slump-resultado');
+  const btn = document.getElementById('slump-btn');
+  const val = parseInt(input.value,10);
+  if(isNaN(val)){ out.innerHTML=''; btn.disabled = true; btn.textContent='Confirmar leitura'; btn.className='btn btn-primary'; return; }
+  const ok = val >= t.min && val <= t.max;
+  out.innerHTML = ok
+    ? `<div class="banner green"><strong>Dentro da tolerância</strong>Medido ${val} mm (pedido ${t.alvo} ± ${t.tol} mm).</div>`
+    : `<div class="banner red"><strong>Caminhão recusado</strong>Medido ${val} mm — fora de ${t.min}–${t.max} mm.</div>`;
+  btn.disabled = false;
+  btn.dataset.aceito = ok ? '1' : '0';
+  btn.textContent = ok ? 'Confirmar e seguir para a moldagem' : 'Registrar recusa e encerrar';
+  btn.className = 'btn ' + (ok ? 'btn-primary' : 'btn-danger');
+};
+function screenMoldagem(){
+  const l = loteById(state.ctx.loteId);
+  const nextId = 1000 + DB.lotes.reduce(function(n,x){ return n+x.amostras.length; },0);
+  const body = `
+    <div class="card">
+      <div class="kv"><span class="k">Peça</span><span class="v" style="font-family:var(--sans)">${l.peca}</span></div>
+      <div class="kv"><span class="k">Identificação</span><span class="v">CP-2026-${nextId}</span></div>
+    </div>
+    <p class="note">A amostra é retirada de um caminhão. São moldados 2 corpos de prova para 7 dias e 2 para 28 dias — dois não é redundância: é o que forma o exemplar e permite descartar um mal moldado.</p>
+    <div class="section-label">Corpos de prova a moldar</div>
+    <div class="cp-grid">
+      <div class="cp-slot"><div class="lbl">7 dias · CP A</div><div class="done">em cura</div></div>
+      <div class="cp-slot"><div class="lbl">7 dias · CP B</div><div class="done">em cura</div></div>
+      <div class="cp-slot"><div class="lbl">28 dias · CP A</div><div class="done">em cura</div></div>
+      <div class="cp-slot"><div class="lbl">28 dias · CP B</div><div class="done">em cura</div></div>
+    </div>`;
+  const footer = `<button class="btn btn-primary" data-action="moldar-cps" data-loteid="${l.id}">Confirmar moldagem</button>`;
+  return shell({ accent:'#AD7A28', network:'offline', title:'Moldagem dos corpos de prova', body:body, footer:footer });
+}
+function screenEnvioLab(){
+  const l = loteById(state.ctx.loteId);
+  const body = `
+    <div class="banner green"><strong>Corpos de prova moldados</strong>Identificados e rastreados até ${l.peca}.</div>
+    <p class="note">Ao enviar, os corpos de prova entram na fila do laboratório e o lote passa a aguardar os resultados do rompimento.</p>`;
+  const footer = `<button class="btn btn-primary" data-action="enviar-lab" data-loteid="${l.id}">Enviar ao laboratório</button>`;
+  return shell({ accent:'#AD7A28', network:'offline', title:'Envio ao laboratório', body:body, footer:footer });
+}
+
+/* ---------------------------- laboratório ---------------------------- */
+function screenHomeLaboratorio(){
+  let pendentes = 0;
+  DB.lotes.forEach(function(l){ l.amostras.forEach(function(am){
+    [7,28].forEach(function(idade){ if(exemplarValor(am.cps,idade)==null && am.cps.some(function(c){return c.idade===idade;})) pendentes++; });
+  }); });
+  const body = `
+    ${sessionLine()}
+    <div class="menu">${menuRow('lab-lista','Corpos de prova recebidos', pendentes+' exemplar(es) pendente(s)')}</div>
+    <p class="note">O laboratório só lança o resultado do rompimento — não decide a aceitação do lote. Este perfil não tem, e nunca vai ter, acesso a pedido, lote ou aceitação: é a única tela que existe aqui.</p>`;
+  return shell({ accent:'#3F7D5C', title:'Laboratório', body:body });
+}
+function screenLabLista(){
+  const rows = [];
+  DB.lotes.forEach(function(l){ l.amostras.forEach(function(am,idx){
+    const pend7 = exemplarValor(am.cps,7)==null;
+    const pend28 = exemplarValor(am.cps,28)==null;
+    if(pend7 || pend28){
+      rows.push(menuRow('lab-lancar', am.identificacao || ('Amostra '+(idx+1)), 'Lote '+l.numero+' · '+am.peca, {loteId:l.id, amIdx:idx}));
+    }
+  }); });
+  const body = rows.length ? `<div class="menu">${rows.join('')}</div>` : `<div class="empty">Nenhum corpo de prova aguardando lançamento.</div>`;
+  return shell({ accent:'#3F7D5C', title:'Corpos de prova', body:body });
+}
+function cpSlotHtml(am, idade, letra, cpIndex){
+  const cp = am.cps.filter(function(c){return c.idade===idade;})[cpIndex];
+  if(cp && cp.resultado!=null){
+    return `<div class="cp-slot"><div class="lbl">${idade} dias · CP ${letra}</div><div class="done">${cp.resultado} MPa</div></div>`;
+  }
+  return `<div class="cp-slot"><div class="lbl">${idade} dias · CP ${letra}</div><input type="number" step="0.1" id="cp-${idade}-${cpIndex}" placeholder="MPa" /></div>`;
+}
+function screenLabLancar(){
+  const l = loteById(state.ctx.loteId);
+  const am = l.amostras[state.ctx.amIdx];
+  const body = `
+    <div class="card">
+      <div class="kv"><span class="k">Lote</span><span class="v" style="font-family:var(--sans)">${l.numero}</span></div>
+      <div class="kv"><span class="k">Peça</span><span class="v" style="font-family:var(--sans)">${am.peca}</span></div>
+    </div>
+    <div class="section-label">7 dias — alerta, não decide</div>
+    <div class="cp-grid">${cpSlotHtml(am,7,'A',0)}${cpSlotHtml(am,7,'B',1)}</div>
+    <div class="section-label">28 dias — decide a aceitação</div>
+    <div class="cp-grid">${cpSlotHtml(am,28,'A',0)}${cpSlotHtml(am,28,'B',1)}</div>`;
+  const footer = `<button class="btn btn-primary" data-action="lancar-resultado" data-loteid="${l.id}" data-amidx="${state.ctx.amIdx}">Salvar resultados</button>`;
+  return shell({ accent:'#3F7D5C', title:'Lançar rompimento', body:body, footer:footer });
+}
+
+/* ---------------------------- roteador ---------------------------- */
+function render(){
+  const map = {
+    'login': screenLogin,
+    'home-construtora': screenHomeConstrutora,
+    'c-obras': screenObrasPecas,
+    'c-cadastros': screenCadastros,
+    'c-classes': screenClasses,
+    'c-lotes': screenLotes,
+    'c-lote-detalhe': screenLoteDetalhe,
+    'c-aceitacao': screenAceitacao,
+    'c-aceitacao-detalhe': screenAceitacaoDetalhe,
+    'home-obra': screenHomeObra,
+    'o-lotes': screenObraLotes,
+    'o-chegada': screenChegada,
+    'o-janela90': screenJanela90,
+    'o-slump': screenSlump,
+    'o-moldagem': screenMoldagem,
+    'o-envio': screenEnvioLab,
+    'home-laboratorio': screenHomeLaboratorio,
+    'lab-lista': screenLabLista,
+    'lab-lancar': screenLabLancar
+  };
+  const fn = map[state.screen] || screenLogin;
+  document.getElementById('app').innerHTML = fn();
+  if(state.screen === 'o-janela90') startCountdown();
+}
+
+/* ---------------------------- ações ---------------------------- */
+document.addEventListener('click', function(e){
+  const el = e.target.closest('[data-action]');
+  if(!el) return;
+  const action = el.dataset.action;
+
+  if(action==='back'){ goBack(); return; }
+  if(action==='logout'){ logout(); return; }
+  if(action==='submit-login'){ tryLogin(); return; }
+  if(action==='buscar-lote'){
+    const codigo = (document.getElementById('busca-lote-input').value || '').trim();
+    const achado = DB.lotes.find(function(l){ return l.numero === codigo; });
+    if(achado){ navigate('c-lote-detalhe', { loteId: achado.id }); return; }
+    const out = document.getElementById('busca-lote-resultado');
+    if(codigo && out){
+      out.innerHTML = '<div class="banner red" style="margin-top:10px"><strong>Acesso negado</strong>Este lote pertence a outra construtora, ou não existe. A API só devolve dados de quem está logado.</div>';
+    }
+    return;
+  }
+  if(action==='nav'){
+    const ctx = el.dataset.ctx ? JSON.parse(el.dataset.ctx) : {};
+    navigate(el.dataset.to, ctx);
+    return;
+  }
+  if(action==='add-peca'){
+    const v = document.getElementById('nova-peca').value.trim();
+    if(v){ DB.obra.pavimentos[0].pecas.push(v); render(); }
+    return;
+  }
+  if(action==='add-classe'){
+    const nome = document.getElementById('nc-nome').value.trim();
+    const fck = parseInt(document.getElementById('nc-fck').value,10);
+    const abat = document.getElementById('nc-abat').value.trim() || '—';
+    if(nome && fck){ DB.classes.push({ id:'c'+Date.now(), nome:nome, fck:fck, abatimento:abat, agregado:'19 mm' }); render(); }
+    return;
+  }
+  if(action==='add-pedido'){
+    const numero = document.getElementById('np-numero').value.trim();
+    const peca = document.getElementById('np-peca').value.trim();
+    const volume = parseFloat(document.getElementById('np-volume').value) || 0;
+    if(numero && peca){
+      DB.lotes.push({ id:'l'+Date.now(), numero:numero, peca:peca, classeId:DB.classes[0].id, volume:volume,
+        caminhoesPlanejados:1, status:'aguardando_caminhao', caminhoes:[], amostras:[] });
+      render();
+    }
+    return;
+  }
+  if(action==='decidir-aceitacao'){
+    const l = loteById(state.ctx.loteId);
+    const cl = classeById(l.classeId);
+    const exemplares28 = [];
+    l.amostras.forEach(function(am){ const v = exemplarValor(am.cps,28); if(v!=null) exemplares28.push(v); });
+    const fckEst = calcFckEst(exemplares28);
+    l.status = (fckEst!=null && fckEst>=cl.fck) ? 'aceito' : 'reprovado';
+    navigate('c-aceitacao');
+    return;
+  }
+  if(action==='confirmar-chegada'){
+    const l = loteById(state.ctx.loteId);
+    l.caminhoes.push({ placa:'QRZ-4C18', nota:'45.820', horaContato:'08:05', statusCaminhao:'chegando' });
+    navigate('o-janela90', { loteId:l.id });
+    return;
+  }
+  if(action==='confirmar-slump'){
+    const aceito = el.dataset.aceito === '1';
+    const l = loteById(el.dataset.loteid);
+    if(aceito){
+      navigate('o-moldagem', { loteId:l.id });
+    } else {
+      l.caminhoes[l.caminhoes.length-1].statusCaminhao = 'recusado';
+      logout(); enterRole('obra');
+    }
+    return;
+  }
+  if(action==='moldar-cps'){
+    const l = loteById(el.dataset.loteid);
+    const nextId = 1000 + DB.lotes.reduce(function(n,x){ return n+x.amostras.length; },0);
+    l.amostras.push({ peca:l.peca, identificacao:'CP-2026-'+nextId,
+      cps:[ {idade:7,resultado:null},{idade:7,resultado:null},{idade:28,resultado:null},{idade:28,resultado:null} ] });
+    navigate('o-envio', { loteId:l.id });
+    return;
+  }
+  if(action==='enviar-lab'){
+    const l = loteById(el.dataset.loteid);
+    l.status = 'aguardando_resultados';
+    stopCountdown();
+    state.stack = [];
+    state.screen = 'home-obra';
+    state.ctx = {};
+    render();
+    return;
+  }
+  if(action==='lancar-resultado'){
+    const l = loteById(el.dataset.loteid);
+    const am = l.amostras[parseInt(el.dataset.amidx,10)];
+    [7,28].forEach(function(idade){
+      const cps = am.cps.filter(function(c){return c.idade===idade;});
+      cps.forEach(function(cp,i){
+        const input = document.getElementById('cp-'+idade+'-'+i);
+        if(input && input.value !== ''){ cp.resultado = parseFloat(input.value); }
+      });
+    });
+    if(exemplarValor(am.cps,28) != null){ l.status = 'aguardando_aceitacao'; }
+    navigate('lab-lista');
+    return;
+  }
+});
+
+render();
+</script>
+</body>
+</html>
