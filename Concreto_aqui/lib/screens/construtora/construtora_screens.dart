@@ -71,7 +71,7 @@ class _ObrasPecasScreenState extends State<ObrasPecasScreen> {
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          InfoCard(children: [
+          const InfoCard(children: const [
             KvRow(label: 'Obra', value: MockDb.nomeObra),
             KvRow(label: 'Pavimento', value: MockDb.pavimento),
           ]),

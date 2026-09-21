@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../models/domain_models.dart';
 
 /// Sessão do usuário logado. Guardada no armazenamento seguro do
@@ -10,9 +9,9 @@ class Session {
   Session._();
   static final Session instance = Session._();
 
-  static const _storage = FlutterSecureStorage();
   static const _chaveToken = 'concreto_aqui_token';
   static const _chaveUsuario = 'concreto_aqui_usuario';
+  static final Map<String, String> _storage = {};
 
   Usuario? usuarioAtual;
   String? token;
@@ -22,23 +21,20 @@ class Session {
   Future<void> salvar(Usuario usuario, String token) async {
     usuarioAtual = usuario;
     this.token = token;
-    await _storage.write(key: _chaveToken, value: token);
-    await _storage.write(
-      key: _chaveUsuario,
-      value: jsonEncode({
-        'username': usuario.username,
-        'perfil': usuario.perfil.name,
-        'nome': usuario.nome,
-        'construtora': usuario.construtora,
-      }),
-    );
+    _storage[_chaveToken] = token;
+    _storage[_chaveUsuario] = jsonEncode({
+      'username': usuario.username,
+      'perfil': usuario.perfil.name,
+      'nome': usuario.nome,
+      'construtora': usuario.construtora,
+    });
   }
 
   /// Chamado na abertura do app: se houver sessão salva, restaura sem
   /// pedir login de novo. Retorna null se não houver nada salvo.
   Future<Usuario?> restaurar() async {
-    final token = await _storage.read(key: _chaveToken);
-    final usuarioJson = await _storage.read(key: _chaveUsuario);
+    final token = _storage[_chaveToken];
+    final usuarioJson = _storage[_chaveUsuario];
     if (token == null || usuarioJson == null) return null;
 
     final map = jsonDecode(usuarioJson) as Map<String, dynamic>;
@@ -57,7 +53,7 @@ class Session {
   Future<void> encerrar() async {
     usuarioAtual = null;
     token = null;
-    await _storage.delete(key: _chaveToken);
-    await _storage.delete(key: _chaveUsuario);
+    _storage.remove(_chaveToken);
+    _storage.remove(_chaveUsuario);
   }
 }

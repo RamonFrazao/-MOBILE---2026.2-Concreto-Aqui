@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'package:http/http.dart' as http;
+import 'dart:io';
 import '../data/mock_db.dart';
 import '../models/domain_models.dart';
 import 'api_config.dart';
@@ -12,7 +12,8 @@ class LoginResult {
   final String? token;
   final String? erro;
 
-  const LoginResult.sucesso(Usuario this.usuario, String this.token) : erro = null;
+  const LoginResult.sucesso(Usuario this.usuario, String this.token)
+      : erro = null;
   const LoginResult.falha()
       : usuario = null,
         token = null,
@@ -32,22 +33,24 @@ abstract class AuthService {
 class ApiAuthService implements AuthService {
   @override
   Future<LoginResult> login(String username, String senha) async {
+    final client = HttpClient();
     try {
-      final resp = await http
-          .post(
-            Uri.parse('${ApiConfig.baseUrl}/auth/login'),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({'username': username, 'senha': senha}),
-          )
+      final request = await client
+          .postUrl(Uri.parse('${ApiConfig.baseUrl}/auth/login'))
           .timeout(const Duration(seconds: 8));
+      request.headers.contentType = ContentType.json;
+      request.write(jsonEncode({'username': username, 'senha': senha}));
+      final response =
+          await request.close().timeout(const Duration(seconds: 8));
+      final responseBody = await response.transform(utf8.decoder).join();
 
-      if (resp.statusCode != 200) {
+      if (response.statusCode != HttpStatus.ok) {
         // A API já responde com a mensagem genérica; não repassamos
         // nenhum outro detalhe do erro para a tela de login.
         return const LoginResult.falha();
       }
 
-      final data = jsonDecode(resp.body) as Map<String, dynamic>;
+      final data = jsonDecode(responseBody) as Map<String, dynamic>;
       final u = data['usuario'] as Map<String, dynamic>;
       final usuario = Usuario(
         username: u['username'] as String,
@@ -61,6 +64,8 @@ class ApiAuthService implements AuthService {
       // Sem rede, API fora do ar, resposta inesperada — tudo isso também
       // não pode virar uma pista sobre usuário/senha para quem tenta entrar.
       return const LoginResult.falha();
+    } finally {
+      client.close(force: true);
     }
   }
 }
