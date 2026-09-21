@@ -34,7 +34,7 @@ mock do app Flutter — entra aqui na E2.
   Sucesso: `{ token, usuario: { username, perfil, nome, construtora } }`.
   Falha: sempre `401 { erro: "Usuário ou senha inválidos." }`, usuário
   exista ou não.
-- `GET /lotes/:codigo` — precisa de `Authorization: Bearer <token>`.
+- `GET /lotes?codigo=...` — precisa de `Authorization: Bearer <token>`.
   - Lote da própria construtora → `200` com os dados do lote.
   - Lote de outra construtora → `403 { erro: "Acesso negado: este lote
     pertence a outra construtora." }`.
