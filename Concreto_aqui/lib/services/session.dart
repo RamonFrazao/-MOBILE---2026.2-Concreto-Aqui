@@ -5,7 +5,7 @@ import '../models/domain_models.dart';
 /// Sessão do usuário logado. Guardada no armazenamento seguro do
 /// aparelho — por isso não se pede login de novo a cada abertura do app.
 /// O que fica salvo é o token de sessão (JWT) e os dados do usuário que
-/// a API já devolveu; a senha nunca passa por aqui.
+/// a API já devolveu; a senha nunca passa por aqui
 class Session {
   Session._();
   static final Session instance = Session._();

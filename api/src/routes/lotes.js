@@ -7,10 +7,19 @@ const { autenticar } = require('../middleware/auth');
 // e uma barra dentro de um segmento de rota (/lotes/12/03) quebraria o
 // roteamento — a query string não tem esse problema.
 //
-// Se o lote existir mas for de outra construtora, a resposta é 403 com
-// mensagem clara — nunca os dados do lote, e nunca uma mensagem que
-// deixe adivinhar se ele existe ou não para quem não tem acesso.
+// Regras, na ordem em que são conferidas:
+//   1. Sem token válido -> 401 (feito pelo middleware).
+//   2. Perfil "laboratorio" -> 403. O laboratório só lança resultado de
+//      rompimento; pedido, lote e aceitação não são dele, nem pela API.
+//   3. Lote de outra construtora -> 403 com mensagem clara, sem devolver
+//      nenhum dado do lote.
 router.get('/', autenticar, async (req, res) => {
+  if (req.usuario.perfil === 'laboratorio') {
+    return res.status(403).json({
+      erro: 'Acesso negado: o perfil de laboratório não acessa pedidos, lotes nem aceitação.',
+    });
+  }
+
   const codigo = req.query.codigo;
 
   if (!codigo) {
