@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'dart:io';
+import 'package:http/http.dart' as http;
 import '../data/mock_db.dart';
 import '../models/domain_models.dart';
 import 'api_config.dart';
@@ -12,8 +12,7 @@ class LoginResult {
   final String? token;
   final String? erro;
 
-  const LoginResult.sucesso(Usuario this.usuario, String this.token)
-      : erro = null;
+  const LoginResult.sucesso(Usuario this.usuario, String this.token) : erro = null;
   const LoginResult.falha()
       : usuario = null,
         token = null,
@@ -30,27 +29,30 @@ abstract class AuthService {
 
 /// Implementação real: chama a API, que confere a senha cifrada
 /// (bcrypt) no servidor e devolve um token de sessão (JWT).
+///
+/// Usa o pacote http (não dart:io) de propósito: dart:io não existe no
+/// Flutter Web, então qualquer chamada de rede aqui precisa passar pela
+/// camada cross-platform do pacote http para funcionar em todas as
+/// plataformas (mobile, desktop e web) com o mesmo código.
 class ApiAuthService implements AuthService {
   @override
   Future<LoginResult> login(String username, String senha) async {
-    final client = HttpClient();
     try {
-      final request = await client
-          .postUrl(Uri.parse('${ApiConfig.baseUrl}/auth/login'))
+      final resp = await http
+          .post(
+            Uri.parse('${ApiConfig.baseUrl}/auth/login'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'username': username, 'senha': senha}),
+          )
           .timeout(const Duration(seconds: 8));
-      request.headers.contentType = ContentType.json;
-      request.write(jsonEncode({'username': username, 'senha': senha}));
-      final response =
-          await request.close().timeout(const Duration(seconds: 8));
-      final responseBody = await response.transform(utf8.decoder).join();
 
-      if (response.statusCode != HttpStatus.ok) {
+      if (resp.statusCode != 200) {
         // A API já responde com a mensagem genérica; não repassamos
         // nenhum outro detalhe do erro para a tela de login.
         return const LoginResult.falha();
       }
 
-      final data = jsonDecode(responseBody) as Map<String, dynamic>;
+      final data = jsonDecode(resp.body) as Map<String, dynamic>;
       final u = data['usuario'] as Map<String, dynamic>;
       final usuario = Usuario(
         username: u['username'] as String,
@@ -64,8 +66,6 @@ class ApiAuthService implements AuthService {
       // Sem rede, API fora do ar, resposta inesperada — tudo isso também
       // não pode virar uma pista sobre usuário/senha para quem tenta entrar.
       return const LoginResult.falha();
-    } finally {
-      client.close(force: true);
     }
   }
 }
