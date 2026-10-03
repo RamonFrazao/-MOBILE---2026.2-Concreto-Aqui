@@ -4,6 +4,7 @@ import '../../models/domain_models.dart';
 import '../../services/lote_repository.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/shared_widgets.dart';
+import 'cadastros_screens.dart';
 
 const _accent = AppColors.accentConstrutora;
 
@@ -12,8 +13,9 @@ class HomeConstrutoraScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final pendentes =
-        MockDb.lotes.where((l) => l.status == StatusLote.aguardandoAceitacao).length;
+    final pendentes = MockDb.lotes
+        .where((l) => l.status == StatusLote.aguardandoAceitacao)
+        .length;
     return AppShell(
       title: 'Construtora',
       accent: _accent,
@@ -25,27 +27,34 @@ class HomeConstrutoraScreen extends StatelessWidget {
           MenuRow(
             titulo: 'Obras e peças',
             subtitulo: 'Pavimentos e peças de destino',
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ObrasPecasScreen())),
+            onTap: () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const ObrasPecasScreen())),
           ),
           MenuRow(
             titulo: 'Centrais e laboratórios',
             subtitulo: 'Cadastro de fornecedores',
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CadastrosScreen())),
+            onTap: () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const CadastrosScreen())),
           ),
           MenuRow(
             titulo: 'Classes de concreto',
             subtitulo: 'fck, abatimento, agregado',
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ClassesScreen())),
+            onTap: () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const ClassesScreen())),
           ),
           MenuRow(
             titulo: 'Pedidos e lotes',
             subtitulo: '${MockDb.lotes.length} registrados',
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LotesScreen())),
+            onTap: () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const LotesScreen())),
           ),
           MenuRow(
             titulo: 'Aceitação de lotes',
-            subtitulo: pendentes > 0 ? '$pendentes aguardando decisão' : 'nenhum pendente',
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AceitacaoScreen())),
+            subtitulo: pendentes > 0
+                ? '$pendentes aguardando decisão'
+                : 'nenhum pendente',
+            onTap: () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const AceitacaoScreen())),
           ),
         ],
       ),
@@ -71,22 +80,28 @@ class _ObrasPecasScreenState extends State<ObrasPecasScreen> {
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const InfoCard(children: const [
+          const InfoCard(children: [
             KvRow(label: 'Obra', value: MockDb.nomeObra),
             KvRow(label: 'Pavimento', value: MockDb.pavimento),
           ]),
           const Text('Peças cadastradas',
-              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.inkSoft)),
+              style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.inkSoft)),
           const SizedBox(height: 8),
           ...MockDb.pecas.map((p) => Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 12),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 13, vertical: 12),
                   decoration: BoxDecoration(
                     border: Border.all(color: AppColors.line),
                     borderRadius: BorderRadius.circular(11),
                   ),
-                  child: Text(p, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5)),
+                  child: Text(p,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w600, fontSize: 13.5)),
                 ),
               )),
           const SizedBox(height: 8),
@@ -118,40 +133,6 @@ class _ObrasPecasScreenState extends State<ObrasPecasScreen> {
   }
 }
 
-class CadastrosScreen extends StatelessWidget {
-  const CadastrosScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return AppShell(
-      title: 'Centrais e laboratórios',
-      accent: _accent,
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('Centrais',
-              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.inkSoft)),
-          const SizedBox(height: 8),
-          ...MockDb.centrais.map((c) => _linhaSimples(c)),
-          const SizedBox(height: 16),
-          const Text('Laboratórios',
-              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.inkSoft)),
-          const SizedBox(height: 8),
-          ...MockDb.laboratorios.map((c) => _linhaSimples(c)),
-          const NoteText('A central de concreto é apenas cadastro — não tem acesso ao aplicativo.'),
-        ],
-      ),
-    );
-  }
-
-  Widget _linhaSimples(String texto) => Container(
-        margin: const EdgeInsets.only(bottom: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 12),
-        decoration: BoxDecoration(border: Border.all(color: AppColors.line), borderRadius: BorderRadius.circular(11)),
-        child: Text(texto, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5)),
-      );
-}
-
 class ClassesScreen extends StatefulWidget {
   const ClassesScreen({super.key});
 
@@ -179,20 +160,31 @@ class _ClassesScreenState extends State<ClassesScreen> {
               ])),
           const SizedBox(height: 8),
           const Text('Nova classe',
-              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.inkSoft)),
+              style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.inkSoft)),
           const SizedBox(height: 8),
-          TextField(controller: _nomeCtrl, decoration: const InputDecoration(hintText: 'ex.: C35')),
+          TextField(
+              controller: _nomeCtrl,
+              decoration: const InputDecoration(hintText: 'ex.: C35')),
           const SizedBox(height: 8),
-          TextField(controller: _fckCtrl, decoration: const InputDecoration(hintText: 'fck de projeto (MPa)')),
+          TextField(
+              controller: _fckCtrl,
+              decoration:
+                  const InputDecoration(hintText: 'fck de projeto (MPa)')),
           const SizedBox(height: 8),
-          TextField(controller: _abatCtrl, decoration: const InputDecoration(hintText: '80 ± 20 mm')),
+          TextField(
+              controller: _abatCtrl,
+              decoration: const InputDecoration(hintText: '80 ± 20 mm')),
           const SizedBox(height: 10),
           PrimaryButton(
             texto: 'Adicionar classe',
             onPressed: () {
               final nome = _nomeCtrl.text.trim();
               final fck = int.tryParse(_fckCtrl.text.trim());
-              final abat = _abatCtrl.text.trim().isEmpty ? '—' : _abatCtrl.text.trim();
+              final abat =
+                  _abatCtrl.text.trim().isEmpty ? '—' : _abatCtrl.text.trim();
               if (nome.isEmpty || fck == null) return;
               setState(() {
                 MockDb.classes.add(ClasseConcreto(
@@ -239,7 +231,8 @@ class _LotesScreenState extends State<LotesScreen> {
     });
     // Esta busca vai na API de verdade — é o servidor quem decide se o
     // lote pedido é desta construtora ou não, não o app.
-    final resultado = await _loteRepository.buscarPorCodigo(_buscaCtrl.text.trim());
+    final resultado =
+        await _loteRepository.buscarPorCodigo(_buscaCtrl.text.trim());
     if (!mounted) return;
     setState(() {
       _buscando = false;
@@ -265,19 +258,32 @@ class _LotesScreenState extends State<LotesScreen> {
             return MenuRow(
               titulo: 'Lote ${l.numero} · ${l.peca}',
               subtitulo: '${cl.nome} · ${l.volume} m³',
-              trailing: StatusBadge(texto: st.label, cor: st.cor, fundo: st.fundo),
-              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => LoteDetalheScreen(loteId: l.id))),
+              trailing:
+                  StatusBadge(texto: st.label, cor: st.cor, fundo: st.fundo),
+              onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => LoteDetalheScreen(loteId: l.id))),
             );
           }),
           const SizedBox(height: 8),
           const Text('Novo pedido',
-              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.inkSoft)),
+              style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.inkSoft)),
           const SizedBox(height: 8),
-          TextField(controller: _numeroCtrl, decoration: const InputDecoration(hintText: 'ex.: 20/03')),
+          TextField(
+              controller: _numeroCtrl,
+              decoration: const InputDecoration(hintText: 'ex.: 20/03')),
           const SizedBox(height: 8),
-          TextField(controller: _pecaCtrl, decoration: const InputDecoration(hintText: 'ex.: Viga V-04')),
+          TextField(
+              controller: _pecaCtrl,
+              decoration: const InputDecoration(hintText: 'ex.: Viga V-04')),
           const SizedBox(height: 8),
-          TextField(controller: _volumeCtrl, decoration: const InputDecoration(hintText: 'Volume (m³)')),
+          TextField(
+              controller: _volumeCtrl,
+              decoration: const InputDecoration(hintText: 'Volume (m³)')),
           const SizedBox(height: 10),
           PrimaryButton(
             texto: 'Abrir lote',
@@ -304,17 +310,29 @@ class _LotesScreenState extends State<LotesScreen> {
           ),
           const SizedBox(height: 20),
           const Text('Buscar lote por código (via API)',
-              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.inkSoft)),
+              style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.inkSoft)),
           const SizedBox(height: 8),
-          TextField(controller: _buscaCtrl, decoration: const InputDecoration(hintText: 'ex.: 19/07')),
+          TextField(
+              controller: _buscaCtrl,
+              decoration: const InputDecoration(hintText: 'ex.: 19/07')),
           const SizedBox(height: 8),
           OutlinedButton(
             onPressed: _buscando ? null : _buscar,
             child: _buscando
-                ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                ? const SizedBox(
+                    height: 16,
+                    width: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2))
                 : const Text('Buscar'),
           ),
-          if (_erroBusca != null) AppBanner(titulo: 'Não foi possível abrir', texto: _erroBusca!, tom: BannerTom.vermelho),
+          if (_erroBusca != null)
+            AppBanner(
+                titulo: 'Não foi possível abrir',
+                texto: _erroBusca!,
+                tom: BannerTom.vermelho),
           if (_loteEncontrado != null)
             InfoCard(children: [
               KvRow(label: 'Lote', value: '${_loteEncontrado!['numero']}'),
@@ -348,16 +366,20 @@ class LoteDetalheScreen extends StatelessWidget {
           InfoCard(children: [
             KvRow(label: 'Exemplares (28 dias)', value: '${l.amostras.length}'),
             KvRow(label: 'fck de projeto', value: '${cl.fck} MPa'),
-            KvRow(label: 'fck,est', value: fckEst != null ? '$fckEst MPa' : '—'),
+            KvRow(
+                label: 'fck,est', value: fckEst != null ? '$fckEst MPa' : '—'),
           ]),
           if (l.amostras.isNotEmpty)
-            NoteText('Amostra de referência: ${l.amostras.first.identificacao} (${l.amostras.first.peca}).'),
+            NoteText(
+                'Amostra de referência: ${l.amostras.first.identificacao} (${l.amostras.first.peca}).'),
         ],
       );
     } else if (l.caminhoes.isNotEmpty) {
-      corpo = const NoteText('Aguardando o técnico da obra concluir o recebimento do caminhão e a moldagem dos corpos de prova.');
+      corpo = const NoteText(
+          'Aguardando o técnico da obra concluir o recebimento do caminhão e a moldagem dos corpos de prova.');
     } else {
-      corpo = const NoteText('Aguardando o técnico da obra registrar a chegada do caminhão. A construtora não executa etapas de campo.');
+      corpo = const NoteText(
+          'Aguardando o técnico da obra registrar a chegada do caminhão. A construtora não executa etapas de campo.');
     }
 
     return AppShell(
@@ -376,7 +398,8 @@ class LoteDetalheScreen extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('Status', style: TextStyle(color: AppColors.inkSoft, fontSize: 13)),
+                  const Text('Status',
+                      style: TextStyle(color: AppColors.inkSoft, fontSize: 13)),
                   StatusBadge(texto: st.label, cor: st.cor, fundo: st.fundo),
                 ],
               ),
@@ -394,9 +417,13 @@ class AceitacaoScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final pendentes = MockDb.lotes.where((l) => l.status == StatusLote.aguardandoAceitacao).toList();
-    final decididos =
-        MockDb.lotes.where((l) => l.status == StatusLote.aceito || l.status == StatusLote.reprovado).toList();
+    final pendentes = MockDb.lotes
+        .where((l) => l.status == StatusLote.aguardandoAceitacao)
+        .toList();
+    final decididos = MockDb.lotes
+        .where((l) =>
+            l.status == StatusLote.aceito || l.status == StatusLote.reprovado)
+        .toList();
 
     return AppShell(
       title: 'Aceitação de lotes',
@@ -405,7 +432,10 @@ class AceitacaoScreen extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text('Aguardando decisão',
-              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.inkSoft)),
+              style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.inkSoft)),
           const SizedBox(height: 8),
           if (pendentes.isEmpty)
             _vazio('Nenhum lote aguardando aceitação no momento.')
@@ -414,17 +444,25 @@ class AceitacaoScreen extends StatelessWidget {
                   titulo: 'Lote ${l.numero}',
                   subtitulo: l.peca,
                   onTap: () => Navigator.push(
-                      context, MaterialPageRoute(builder: (_) => AceitacaoDetalheScreen(loteId: l.id))),
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) =>
+                              AceitacaoDetalheScreen(loteId: l.id))),
                 )),
           const SizedBox(height: 16),
           const Text('Histórico',
-              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.inkSoft)),
+              style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.inkSoft)),
           const SizedBox(height: 8),
           ...decididos.map((l) => MenuRow(
                 titulo: 'Lote ${l.numero}',
                 subtitulo: l.peca,
-                onTap: () =>
-                    Navigator.push(context, MaterialPageRoute(builder: (_) => LoteDetalheScreen(loteId: l.id))),
+                onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => LoteDetalheScreen(loteId: l.id))),
               )),
         ],
       ),
@@ -438,7 +476,9 @@ class AceitacaoScreen extends StatelessWidget {
           borderRadius: BorderRadius.circular(11),
         ),
         alignment: Alignment.center,
-        child: Text(texto, style: const TextStyle(color: AppColors.inkSoft, fontSize: 12.5), textAlign: TextAlign.center),
+        child: Text(texto,
+            style: const TextStyle(color: AppColors.inkSoft, fontSize: 12.5),
+            textAlign: TextAlign.center),
       );
 }
 
@@ -466,11 +506,13 @@ class _AceitacaoDetalheScreenState extends State<AceitacaoDetalheScreen> {
         children: [
           InfoCard(children: [
             KvRow(label: 'fck de projeto', value: '${cl.fck} MPa'),
-            KvRow(label: 'fck,est', value: fckEst != null ? '$fckEst MPa' : '—'),
+            KvRow(
+                label: 'fck,est', value: fckEst != null ? '$fckEst MPa' : '—'),
           ]),
           AppBanner(
             titulo: aceito ? 'Lote aceito' : 'Lote reprovado',
-            texto: 'fck,est ${aceito ? 'igual ou acima' : 'abaixo'} do fck de projeto (${cl.fck} MPa).',
+            texto:
+                'fck,est ${aceito ? 'igual ou acima' : 'abaixo'} do fck de projeto (${cl.fck} MPa).',
             tom: aceito ? BannerTom.verde : BannerTom.vermelho,
           ),
           const NoteText(
