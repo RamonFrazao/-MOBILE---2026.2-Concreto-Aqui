@@ -7,6 +7,8 @@ const lotesRoutes = require('./routes/lotes');
 const obrasRoutes = require('./routes/obras');
 const centraisRoutes = require('./routes/centrais');
 const laboratoriosRoutes = require('./routes/laboratorios');
+const classesRoutes = require('./routes/classes');
+const pedidosRoutes = require('./routes/pedidos');
 
 const app = express();
 app.use(cors());
@@ -17,6 +19,8 @@ app.use('/lotes', lotesRoutes);
 app.use('/obras', obrasRoutes);
 app.use('/centrais', centraisRoutes);
 app.use('/laboratorios', laboratoriosRoutes);
+app.use('/classes', classesRoutes);
+app.use('/pedidos', pedidosRoutes);
 
 app.get('/', (req, res) => res.json({ ok: true, servico: 'Concreto Aqui API' }));
 
