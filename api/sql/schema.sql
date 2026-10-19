@@ -234,3 +234,78 @@ DROP TRIGGER IF EXISTS caminhoes_pedido_aberto_tg ON caminhoes;
 CREATE TRIGGER caminhoes_pedido_aberto_tg
   BEFORE INSERT OR UPDATE OF pedido_id ON caminhoes
   FOR EACH ROW EXECUTE FUNCTION caminhoes_pedido_aberto();
+
+-- ---------------------------------------------------------------------
+-- Lotes (T06)
+-- O lote é a unidade de julgamento: reúne as peças concretadas na mesma
+-- condição ("os pilares do 3º pavimento, dia 12/03") e guarda o fck de
+-- projeto, o número contra o qual o resultado será comparado na
+-- aceitação. Um lote recebe vários caminhões (caminhoes.lote_id).
+-- A tabela lotes já existia, num desenho anterior (peça em texto livre,
+-- sem obra nem data). Aqui ela ganha os campos novos sem perder nada:
+-- as linhas antigas ficam como estavam, sem obra, e fora da listagem.
+-- ---------------------------------------------------------------------
+
+ALTER TABLE lotes ADD COLUMN IF NOT EXISTS obra_id INTEGER REFERENCES obras(id);
+ALTER TABLE lotes ADD COLUMN IF NOT EXISTS data_concretagem DATE;
+ALTER TABLE lotes ADD COLUMN IF NOT EXISTS fck_projeto INTEGER CHECK (fck_projeto > 0);
+ALTER TABLE lotes ADD COLUMN IF NOT EXISTS encerrado_em TIMESTAMPTZ;
+
+-- O lote nasce "em andamento" e termina "encerrado". (Linhas antigas
+-- podem ter outras situações, como "aceito"; nada as lê como em andamento.)
+ALTER TABLE lotes ALTER COLUMN status SET DEFAULT 'em_andamento';
+
+-- Necessário para a ligação abaixo (peça -> lote -> data) ser conferida
+-- pelo próprio banco.
+CREATE UNIQUE INDEX IF NOT EXISTS lotes_id_data_uq ON lotes (id, data_concretagem);
+
+-- O código do lote ("12/03", "12/03-2"...) não se repete dentro da mesma
+-- construtora. Se o seu banco antigo já tiver dois lotes com o mesmo
+-- código, o índice não é criado (só avisa) e a API segue garantindo a
+-- unicidade dos novos.
+DO $$
+BEGIN
+  CREATE UNIQUE INDEX IF NOT EXISTS lotes_construtora_numero_uq ON lotes (construtora_id, numero);
+EXCEPTION WHEN unique_violation THEN
+  RAISE NOTICE 'Índice lotes_construtora_numero_uq não criado: já existem códigos de lote repetidos numa construtora.';
+END $$;
+
+-- Quais peças o lote abrange. A chave (peca_id, data_concretagem) é única:
+-- uma peça pertence a um lote por concretagem — não pode estar em dois
+-- lotes da mesma data. A data aqui é cópia da data do lote, e a chave
+-- estrangeira composta garante que as duas nunca divirjam.
+CREATE TABLE IF NOT EXISTS lote_pecas (
+  lote_id INTEGER NOT NULL,
+  peca_id INTEGER NOT NULL REFERENCES pecas(id),
+  data_concretagem DATE NOT NULL,
+  PRIMARY KEY (lote_id, peca_id),
+  FOREIGN KEY (lote_id, data_concretagem)
+    REFERENCES lotes (id, data_concretagem) ON DELETE CASCADE
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS lote_pecas_peca_data_uq
+  ON lote_pecas (peca_id, data_concretagem);
+
+-- Lote encerrado não recebe caminhão novo. A API confere ao encerrar; este
+-- gatilho garante o outro lado direto no banco (FOR SHARE faz o
+-- encerramento e a chegada de um caminhão se enfileirarem em vez de se
+-- cruzarem).
+CREATE OR REPLACE FUNCTION caminhoes_lote_em_andamento() RETURNS trigger AS $$
+DECLARE
+  situacao TEXT;
+BEGIN
+  IF NEW.lote_id IS NOT NULL THEN
+    SELECT status INTO situacao FROM lotes WHERE id = NEW.lote_id FOR SHARE;
+    IF situacao = 'encerrado' THEN
+      RAISE EXCEPTION 'Lote encerrado não recebe caminhão'
+        USING ERRCODE = 'check_violation';
+    END IF;
+  END IF;
+  RETURN NEW;
+END
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS caminhoes_lote_em_andamento_tg ON caminhoes;
+CREATE TRIGGER caminhoes_lote_em_andamento_tg
+  BEFORE INSERT OR UPDATE OF lote_id ON caminhoes
+  FOR EACH ROW EXECUTE FUNCTION caminhoes_lote_em_andamento();
