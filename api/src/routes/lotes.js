@@ -1,6 +1,9 @@
 const router = require('express').Router();
 const pool = require('../db');
 const { autenticar } = require('../middleware/auth');
+const { situacaoPrazo, estaForaDoPrazo, sqlLimite, sqlRestanteSegundos, sqlExcedeuMinutos } = require('../prazos');
+const { exemplaresDeCorpos } = require('../exemplares');
+const { calcularFckEst } = require('../aceitacao');
 
 // O lote é a unidade de julgamento: reúne as peças concretadas na mesma
 // condição e guarda o fck de projeto, contra o qual a aceitação vai
@@ -130,7 +133,13 @@ router.get('/', rota(async (req, res) => {
             to_char(l.data_concretagem, 'YYYY-MM-DD') AS data_concretagem,
             (SELECT COUNT(*) FROM lote_pecas lp WHERE lp.lote_id = l.id)::int AS qtd_pecas,
             (SELECT COUNT(*) FROM caminhoes c WHERE c.lote_id = l.id)::int AS qtd_caminhoes,
-            COALESCE((SELECT SUM(c.volume) FROM caminhoes c WHERE c.lote_id = l.id), 0) AS volume_total
+            (SELECT COUNT(*) FROM caminhoes c
+              WHERE c.lote_id = l.id AND c.prazo_minutos IS NOT NULL
+                AND (c.fora_do_prazo OR (c.descarga_fim_em IS NULL AND now() > ${sqlLimite('c')})))::int AS qtd_fora_do_prazo,
+            (SELECT COUNT(*) FROM amostras a
+               JOIN caminhoes c ON c.id = a.caminhao_id
+              WHERE c.lote_id = l.id)::int AS qtd_amostras,
+            COALESCE((SELECT SUM(COALESCE(c.volume_efetivo, c.volume)) FROM caminhoes c WHERE c.lote_id = l.id), 0) AS volume_total
        FROM lotes l
        JOIN obras o ON o.id = l.obra_id
        ${filtro}
@@ -338,24 +347,54 @@ async function carregarLote(executor, id) {
     [id]
   );
   const caminhoes = await executor.query(
-    `SELECT ca.id, ca.placa, ca.volume, ca.criado_em,
-            ce.nome AS central_nome, pe.numero AS pedido_numero
+    `SELECT ca.id, ca.placa, ca.volume, ca.criado_em, ca.numero_nota,
+            ce.nome AS central_nome, pe.numero AS pedido_numero,
+            ca.prazo_minutos, ca.descarga_fim_em, ca.fora_do_prazo, cf.aviso_minutos,
+            ${sqlRestanteSegundos('ca')} AS restante_segundos,
+            ${sqlExcedeuMinutos('ca')} AS excedeu_minutos
        FROM caminhoes ca
        JOIN centrais ce ON ce.id = ca.central_id
+       JOIN lotes lo ON lo.id = ca.lote_id
+       LEFT JOIN configuracoes_prazo cf ON cf.construtora_id = lo.construtora_id
        LEFT JOIN pedidos pe ON pe.id = ca.pedido_id
       WHERE ca.lote_id = $1
       ORDER BY ca.criado_em, ca.id`,
     [id]
   );
 
-  const lista = caminhoes.rows.map((c) => ({ ...c, volume: c.volume === null ? null : Number(c.volume) }));
+  // Caminhão fora do prazo continua aqui: fica marcado, não some nem é bloqueado.
+  const lista = caminhoes.rows.map((c) => {
+    const situacao = situacaoPrazo(c);
+    return {
+      id: c.id,
+      placa: c.placa,
+      volume: c.volume === null ? null : Number(c.volume),
+      criado_em: c.criado_em,
+      central_nome: c.central_nome,
+      pedido_numero: c.pedido_numero,
+      numero_nota: c.numero_nota,
+      situacao_prazo: situacao,
+      fora_do_prazo: estaForaDoPrazo(situacao),
+      restante_segundos: c.descarga_fim_em || c.prazo_minutos === null ? null : Number(c.restante_segundos),
+      excedeu_minutos: Number(c.excedeu_minutos) || 0,
+    };
+  });
   const volumeTotal = lista.reduce((soma, c) => soma + (c.volume || 0), 0);
+
+  const { rows: [contAmostras] } = await pool.query(
+    `SELECT COUNT(*)::int AS n FROM amostras a
+       JOIN caminhoes c ON c.id = a.caminhao_id
+      WHERE c.lote_id = $1`,
+    [lote.id]
+  );
 
   return {
     ...lote,
     pecas: pecas.rows,
     caminhoes: lista,
     qtd_caminhoes: lista.length,
+    qtd_fora_do_prazo: lista.filter((c) => c.fora_do_prazo).length,
+    qtd_amostras: contAmostras?.n || 0,
     volume_total: Math.round(volumeTotal * 100) / 100,
   };
 }
@@ -455,5 +494,521 @@ router.delete('/:id', rota(async (req, res) => {
   }
   res.status(204).end();
 }));
+
+
+// ---------------------------------------------------------------------
+// Exemplares do lote (cálculo no servidor: maior valor, nunca a média)
+// ---------------------------------------------------------------------
+router.get('/:id/exemplares', rota(async (req, res) => {
+  if (req.usuario.perfil === 'laboratorio') {
+    return res.status(403).json({
+      erro: 'Acesso negado: o perfil de laboratório não acessa exemplares nem aceitação.',
+    });
+  }
+  if (!req.usuario.construtoraId) {
+    return res.status(403).json({ erro: 'Acesso negado: o seu usuário não está ligado a uma construtora.' });
+  }
+  const { id } = req.params;
+  if (!idValido(id)) return res.status(400).json({ erro: 'Identificador de lote inválido.' });
+
+  const { rows: [lote] } = await pool.query(
+    `SELECT id, numero, construtora_id, fck_projeto, status
+       FROM lotes WHERE id = $1`,
+    [Number(id)]
+  );
+  if (!lote) return res.status(404).json({ erro: 'Lote não encontrado.' });
+  if (lote.construtora_id !== req.usuario.construtoraId) {
+    return res.status(403).json({ erro: 'Acesso negado: este lote pertence a outra construtora.' });
+  }
+
+  const { rows } = await pool.query(
+    `SELECT cp.id, cp.identificacao, cp.idade, cp.resultado, cp.situacao,
+            a.id AS amostra_id, a.coletada_em,
+            c.numero_nota, c.placa,
+            l.id AS lote_id, l.numero AS lote_numero
+       FROM corpos_prova cp
+       JOIN amostras a ON a.id = cp.amostra_id
+       JOIN caminhoes c ON c.id = a.caminhao_id
+       JOIN lotes l ON l.id = c.lote_id
+      WHERE l.id = $1
+      ORDER BY cp.idade, a.id, cp.id`,
+    [lote.id]
+  );
+
+  const exemplares = exemplaresDeCorpos(rows);
+
+  // Agrupa por idade para a tela
+  const porIdade = {};
+  for (const e of exemplares) {
+    const k = String(e.idade);
+    if (!porIdade[k]) porIdade[k] = [];
+    porIdade[k].push(e);
+  }
+
+  res.json({
+    lote: {
+      id: lote.id,
+      numero: lote.numero,
+      fck_projeto: lote.fck_projeto,
+      status: lote.status,
+    },
+    // regra explícita na resposta, para a tela e para quem auditar
+    regra: 'O resultado do exemplar é o maior valor entre os corpos da mesma amostra e idade — nunca a média.',
+    exemplares,
+    por_idade: porIdade,
+  });
+}));
+
+
+
+// ---------------------------------------------------------------------
+// Aceitação do lote — fck,est (NBR 12655) no servidor
+// ---------------------------------------------------------------------
+
+async function carregarTabelaPsi(executor) {
+  const { rows } = await executor.query(
+    'SELECT condicao_preparo, n_exemplares, psi6 FROM coeficientes_psi6 ORDER BY condicao_preparo, n_exemplares'
+  );
+  return rows;
+}
+
+async function exemplares28DoLote(executor, loteId) {
+  const { rows } = await executor.query(
+    `SELECT cp.id, cp.identificacao, cp.idade, cp.resultado, cp.situacao,
+            a.id AS amostra_id, a.coletada_em,
+            c.numero_nota, c.placa, l.id AS lote_id, l.numero AS lote_numero
+       FROM corpos_prova cp
+       JOIN amostras a ON a.id = cp.amostra_id
+       JOIN caminhoes c ON c.id = a.caminhao_id
+       JOIN lotes l ON l.id = c.lote_id
+      WHERE l.id = $1 AND cp.idade = 28
+      ORDER BY a.id, cp.id`,
+    [loteId]
+  );
+  return exemplaresDeCorpos(rows).filter((e) => e.valor != null);
+}
+
+async function alertas7DoLote(executor, loteId) {
+  const { rows } = await executor.query(
+    `SELECT cp.id, cp.identificacao, cp.idade, cp.resultado, cp.situacao,
+            a.id AS amostra_id, c.numero_nota, c.placa, l.id AS lote_id, l.numero AS lote_numero,
+            a.coletada_em
+       FROM corpos_prova cp
+       JOIN amostras a ON a.id = cp.amostra_id
+       JOIN caminhoes c ON c.id = a.caminhao_id
+       JOIN lotes l ON l.id = c.lote_id
+      WHERE l.id = $1 AND cp.idade = 7
+      ORDER BY a.id, cp.id`,
+    [loteId]
+  );
+  return exemplaresDeCorpos(rows);
+}
+
+// Prévia do fck,est e dos exemplares (não grava).
+router.get('/:id/aceitacao', rota(async (req, res) => {
+  if (req.usuario.perfil === 'laboratorio') {
+    return res.status(403).json({ erro: 'Acesso negado: laboratório não acessa aceitação.' });
+  }
+  if (!req.usuario.construtoraId) {
+    return res.status(403).json({ erro: 'Acesso negado.' });
+  }
+  const { id } = req.params;
+  if (!idValido(id)) return res.status(400).json({ erro: 'Identificador de lote inválido.' });
+
+  const { rows: [lote] } = await pool.query(
+    `SELECT id, numero, construtora_id, fck_projeto, status, condicao_preparo,
+            fck_est, situacao_aceitacao, aceitacao_em, aceitacao_por
+       FROM lotes WHERE id = $1`,
+    [Number(id)]
+  );
+  if (!lote) return res.status(404).json({ erro: 'Lote não encontrado.' });
+  if (lote.construtora_id !== req.usuario.construtoraId) {
+    return res.status(403).json({ erro: 'Acesso negado: este lote pertence a outra construtora.' });
+  }
+
+  const condicao = lote.condicao_preparo || 'A';
+  const tabela = await carregarTabelaPsi(pool);
+  const exemplares28 = await exemplares28DoLote(pool, lote.id);
+  const valores = exemplares28.map((e) => e.valor);
+  const calc = calcularFckEst(valores, condicao, tabela);
+  const alertas7 = await alertas7DoLote(pool, lote.id);
+
+  const { rows: decisoes } = await pool.query(
+    `SELECT d.id, d.decisao, d.detalhe, d.registrada_em, u.nome AS autor
+       FROM decisoes_lote d
+       LEFT JOIN usuarios u ON u.id = d.registrada_por
+      WHERE d.lote_id = $1
+      ORDER BY d.registrada_em DESC`,
+    [lote.id]
+  );
+
+  let veredito = null;
+  if (calc.ok && lote.fck_projeto) {
+    veredito = calc.fck_est >= lote.fck_projeto ? 'aceito' : 'reprovado';
+  }
+
+  res.json({
+    lote: {
+      id: lote.id,
+      numero: lote.numero,
+      fck_projeto: lote.fck_projeto,
+      condicao_preparo: condicao,
+      status: lote.status,
+      situacao_aceitacao: lote.situacao_aceitacao,
+      fck_est_gravado: lote.fck_est != null ? Number(lote.fck_est) : null,
+      aceitacao_em: lote.aceitacao_em,
+    },
+    documentacao_norma:
+      'NBR 12655:2015 amostragem parcial: exemplares de 28 dias ordenados; ' +
+      '2≤n≤5 → Ψ6·f1; 6≤n<20 → 2·média(f1..f(m-1))−fm com m=⌊n/2⌋ e piso Ψ6·f1; ' +
+      'n≥20 → fcm−1,65·sd com piso Ψ6·f1. Ψ6 e condição de preparo vêm do cadastro.',
+    calculo: calc,
+    veredito_sugerido: veredito,
+    exemplares_28: exemplares28.map((e, i) => ({
+      ...e,
+      ordem: calc.ordenados ? calc.ordenados.indexOf(e.valor) + 1 : i + 1,
+    })),
+    alertas_7_dias: alertas7,
+    decisoes,
+  });
+}));
+
+// Define condição de preparo do lote (cadastro).
+router.put('/:id/condicao-preparo', rota(async (req, res) => {
+  if (req.usuario.perfil !== 'construtora') {
+    return res.status(403).json({ erro: 'Só a construtora define a condição de preparo.' });
+  }
+  const { id } = req.params;
+  if (!idValido(id)) return res.status(400).json({ erro: 'Identificador de lote inválido.' });
+  const cond = String(req.body?.condicao_preparo || '').toUpperCase();
+  if (!['A', 'B', 'C'].includes(cond)) {
+    return res.status(400).json({ erro: 'Condição de preparo deve ser A, B ou C (NBR 12655).' });
+  }
+  const { rows: [lote] } = await pool.query(
+    'SELECT id, construtora_id FROM lotes WHERE id = $1',
+    [Number(id)]
+  );
+  if (!lote) return res.status(404).json({ erro: 'Lote não encontrado.' });
+  if (lote.construtora_id !== req.usuario.construtoraId) {
+    return res.status(403).json({ erro: 'Acesso negado.' });
+  }
+  const { rows: [salvo] } = await pool.query(
+    `UPDATE lotes SET condicao_preparo = $2 WHERE id = $1
+     RETURNING id, numero, condicao_preparo`,
+    [lote.id, cond]
+  );
+  res.json(salvo);
+}));
+
+// Confirma aceitação ou reprovação com base no cálculo do servidor.
+router.post('/:id/aceitacao', rota(async (req, res) => {
+  if (req.usuario.perfil !== 'construtora') {
+    return res.status(403).json({ erro: 'Só a construtora confirma a aceitação do lote.' });
+  }
+  if (!req.usuario.construtoraId) {
+    return res.status(403).json({ erro: 'Acesso negado.' });
+  }
+  const { id } = req.params;
+  if (!idValido(id)) return res.status(400).json({ erro: 'Identificador de lote inválido.' });
+
+  const body = req.body || {};
+  const decisao = body.decisao; // obrigatório se reprovado
+  const detalhe = typeof body.detalhe === 'string' ? body.detalhe.trim() : null;
+
+  const { rows: [lote] } = await pool.query(
+    `SELECT id, numero, construtora_id, fck_projeto, status, condicao_preparo, situacao_aceitacao
+       FROM lotes WHERE id = $1`,
+    [Number(id)]
+  );
+  if (!lote) return res.status(404).json({ erro: 'Lote não encontrado.' });
+  if (lote.construtora_id !== req.usuario.construtoraId) {
+    return res.status(403).json({ erro: 'Acesso negado.' });
+  }
+  if (!lote.fck_projeto) {
+    return res.status(409).json({ erro: 'Lote sem fck de projeto; defina o fck antes de aceitar.' });
+  }
+  if (lote.situacao_aceitacao === 'aceito' || lote.situacao_aceitacao === 'reprovado') {
+    return res.status(409).json({
+      erro: `Lote já está ${lote.situacao_aceitacao}.`,
+    });
+  }
+
+  const condicao = lote.condicao_preparo || 'A';
+  const tabela = await carregarTabelaPsi(pool);
+  const exemplares28 = await exemplares28DoLote(pool, lote.id);
+  const calc = calcularFckEst(exemplares28.map((e) => e.valor), condicao, tabela);
+  if (!calc.ok) {
+    return res.status(409).json({ erro: calc.erro, calculo: calc });
+  }
+
+  const veredito = calc.fck_est >= lote.fck_projeto ? 'aceito' : 'reprovado';
+  if (veredito === 'reprovado') {
+    const permitidas = ['revisao_projeto', 'extracao_testemunhos', 'prova_de_carga', 'outra'];
+    if (!permitidas.includes(decisao)) {
+      return res.status(400).json({
+        erro: 'Lote reprovado exige a decisão tomada: revisao_projeto, extracao_testemunhos, prova_de_carga ou outra.',
+        fck_est: calc.fck_est,
+        fck_projeto: lote.fck_projeto,
+      });
+    }
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query(
+      `UPDATE lotes
+          SET fck_est = $2,
+              situacao_aceitacao = $3,
+              aceitacao_em = now(),
+              aceitacao_por = $4,
+              status = CASE WHEN $3 = 'aceito' THEN 'encerrado' ELSE status END
+        WHERE id = $1`,
+      [lote.id, calc.fck_est, veredito, req.usuario.id]
+    );
+    if (veredito === 'reprovado') {
+      await client.query(
+        `INSERT INTO decisoes_lote (lote_id, decisao, detalhe, registrada_por)
+         VALUES ($1, $2, $3, $4)`,
+        [lote.id, decisao, detalhe, req.usuario.id]
+      );
+    }
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+
+  res.status(201).json({
+    lote_id: lote.id,
+    numero: lote.numero,
+    situacao_aceitacao: veredito,
+    fck_est: calc.fck_est,
+    fck_projeto: lote.fck_projeto,
+    calculo: calc,
+    exemplares_28: exemplares28,
+    decisao: veredito === 'reprovado' ? { decisao, detalhe } : null,
+  });
+}));
+
+
+
+// ---------------------------------------------------------------------
+// Relatório de controle do concreto por lote (fiscalização / cliente)
+// Inclui recusados e fora do prazo — não omite o que costuma ser escondido.
+// ---------------------------------------------------------------------
+router.get('/:id/relatorio', rota(async (req, res) => {
+  if (req.usuario.perfil === 'laboratorio') {
+    return res.status(403).json({ erro: 'Acesso negado: laboratório não acessa relatório de lote.' });
+  }
+  if (!req.usuario.construtoraId) {
+    return res.status(403).json({ erro: 'Acesso negado.' });
+  }
+  const { id } = req.params;
+  if (!idValido(id)) return res.status(400).json({ erro: 'Identificador de lote inválido.' });
+
+  const { rows: [lote] } = await pool.query(
+    `SELECT l.id, l.numero, l.peca, l.volume, l.status, l.fck_projeto, l.condicao_preparo,
+            l.fck_est, l.situacao_aceitacao, l.aceitacao_em, l.obra_id,
+            o.nome AS obra_nome, cc.nome AS classe_nome, cc.fck AS classe_fck
+       FROM lotes l
+       LEFT JOIN obras o ON o.id = l.obra_id
+       LEFT JOIN classes_concreto cc ON cc.id = l.classe_id
+      WHERE l.id = $1`,
+    [Number(id)]
+  );
+  if (!lote) return res.status(404).json({ erro: 'Lote não encontrado.' });
+  // construtora_id check
+  const { rows: [own] } = await pool.query(
+    'SELECT construtora_id FROM lotes WHERE id = $1',
+    [lote.id]
+  );
+  if (own.construtora_id !== req.usuario.construtoraId) {
+    return res.status(403).json({ erro: 'Acesso negado: este lote pertence a outra construtora.' });
+  }
+
+  const { rows: pecas } = await pool.query(
+    `SELECT p.id, p.identificacao, pav.nome AS pavimento, o.nome AS obra
+       FROM lote_pecas lp
+       JOIN pecas p ON p.id = lp.peca_id
+       JOIN pavimentos pav ON pav.id = p.pavimento_id
+       JOIN obras o ON o.id = pav.obra_id
+      WHERE lp.lote_id = $1
+      ORDER BY o.nome, pav.nome, p.identificacao`,
+    [lote.id]
+  );
+
+  const { rows: caminhoes } = await pool.query(
+    `SELECT c.id, c.numero_nota, c.placa, c.volume, c.volume_efetivo,
+            c.descarga_inicio_em, c.descarga_fim_em, c.fora_do_prazo, c.recusado,
+            c.abatimento_mm, c.abatimento_ok, c.primeiro_contato_em, c.chegada_obra_em,
+            c.classe_nota, c.fck_nota, ce.nome AS central_nome,
+            ${sqlLimite('c')} AS limite_em,
+            ${sqlExcedeuMinutos('c')} AS excedeu_minutos
+       FROM caminhoes c
+       JOIN centrais ce ON ce.id = c.central_id
+      WHERE c.lote_id = $1
+      ORDER BY c.criado_em`,
+    [lote.id]
+  );
+
+  const { rows: corpos } = await pool.query(
+    `SELECT cp.id, cp.identificacao, cp.idade, cp.resultado, cp.situacao,
+            a.id AS amostra_id, c.numero_nota, c.placa
+       FROM corpos_prova cp
+       JOIN amostras a ON a.id = cp.amostra_id
+       JOIN caminhoes c ON c.id = a.caminhao_id
+      WHERE c.lote_id = $1
+      ORDER BY cp.idade, a.id, cp.id`,
+    [lote.id]
+  );
+  const exemplares = exemplaresDeCorpos(corpos.map((r) => ({
+    ...r,
+    lote_id: lote.id,
+    lote_numero: lote.numero,
+    coletada_em: null,
+  })));
+
+  // fck,est prévia
+  let calculo = null;
+  try {
+    const tabela = await pool.query('SELECT condicao_preparo, n_exemplares, psi6 FROM coeficientes_psi6');
+    const vals = exemplares.filter((e) => e.idade === 28 && e.valor != null).map((e) => e.valor);
+    if (vals.length >= 2) {
+      calculo = calcularFckEst(vals, lote.condicao_preparo || 'A', tabela.rows);
+    }
+  } catch (_) { /* módulo pode não estar em todos os deploys */ }
+
+  const caminhoesFmt = caminhoes.map((c) => {
+    const situacao = c.descarga_fim_em
+      ? (c.fora_do_prazo ? 'fora_do_prazo' : 'no_prazo')
+      : (c.recusado ? 'recusado' : 'em_andamento');
+    return {
+      id: c.id,
+      numero_nota: c.numero_nota,
+      placa: c.placa,
+      central_nome: c.central_nome,
+      volume: c.volume != null ? Number(c.volume) : null,
+      volume_efetivo: c.volume_efetivo != null ? Number(c.volume_efetivo) : null,
+      recusado: !!c.recusado,
+      fora_do_prazo: !!c.fora_do_prazo,
+      situacao_prazo: situacao,
+      excedeu_minutos: c.excedeu_minutos != null ? Number(c.excedeu_minutos) : null,
+      descarga_inicio_em: c.descarga_inicio_em,
+      descarga_fim_em: c.descarga_fim_em,
+      limite_em: c.limite_em,
+      destaque: !!(c.recusado || c.fora_do_prazo),
+      ensaio_abatimento: {
+        medido_mm: c.abatimento_mm,
+        ok: c.abatimento_ok,
+        aceite: c.recusado ? 'recusado' : (c.abatimento_ok === false ? 'recusado' : (c.abatimento_mm != null ? 'aceito' : 'nao_informado')),
+      },
+    };
+  });
+
+  res.json({
+    gerado_em: new Date().toISOString(),
+    lote: {
+      id: lote.id,
+      numero: lote.numero,
+      peca_legado: lote.peca,
+      volume: lote.volume != null ? Number(lote.volume) : null,
+      status: lote.status,
+      fck_projeto: lote.fck_projeto,
+      classe: lote.classe_nome,
+      obra: lote.obra_nome,
+      condicao_preparo: lote.condicao_preparo || 'A',
+      fck_est: lote.fck_est != null ? Number(lote.fck_est) : (calculo && calculo.ok ? calculo.fck_est : null),
+      situacao_aceitacao: lote.situacao_aceitacao,
+      aceitacao_em: lote.aceitacao_em,
+    },
+    pecas,
+    caminhoes: caminhoesFmt,
+    resumo_caminhoes: {
+      total: caminhoesFmt.length,
+      recusados: caminhoesFmt.filter((c) => c.recusado).length,
+      fora_do_prazo: caminhoesFmt.filter((c) => c.fora_do_prazo).length,
+      no_prazo: caminhoesFmt.filter((c) => !c.recusado && c.situacao_prazo === 'no_prazo').length,
+    },
+    exemplares,
+    calculo_fck_est: calculo,
+    observacao:
+      'Caminhões recusados e fora do prazo aparecem destacados neste relatório — não são omitidos.',
+  });
+}));
+
+// Rastreabilidade por peça: todos os ensaios que a cobrem.
+router.get('/rastreabilidade/peca/:pecaId', rota(async (req, res) => {
+  if (req.usuario.perfil === 'laboratorio') {
+    return res.status(403).json({ erro: 'Acesso negado.' });
+  }
+  if (!req.usuario.construtoraId) {
+    return res.status(403).json({ erro: 'Acesso negado.' });
+  }
+  const { pecaId } = req.params;
+  if (!idValido(pecaId)) return res.status(400).json({ erro: 'Identificador de peça inválido.' });
+
+  const { rows: [peca] } = await pool.query(
+    `SELECT p.id, p.identificacao, pav.nome AS pavimento, o.nome AS obra, o.construtora_id
+       FROM pecas p
+       JOIN pavimentos pav ON pav.id = p.pavimento_id
+       JOIN obras o ON o.id = pav.obra_id
+      WHERE p.id = $1`,
+    [Number(pecaId)]
+  );
+  if (!peca) return res.status(404).json({ erro: 'Peça não encontrada.' });
+  if (peca.construtora_id !== req.usuario.construtoraId) {
+    return res.status(403).json({ erro: 'Acesso negado.' });
+  }
+
+  const { rows: lotes } = await pool.query(
+    `SELECT l.id, l.numero, l.fck_projeto, l.fck_est, l.situacao_aceitacao
+       FROM lote_pecas lp
+       JOIN lotes l ON l.id = lp.lote_id
+      WHERE lp.peca_id = $1
+      ORDER BY l.id`,
+    [peca.id]
+  );
+
+  const ensaios = [];
+  for (const l of lotes) {
+    const { rows: cps } = await pool.query(
+      `SELECT cp.identificacao, cp.idade, cp.resultado, cp.situacao,
+              c.numero_nota, c.placa, c.recusado, c.fora_do_prazo
+         FROM corpos_prova cp
+         JOIN amostras a ON a.id = cp.amostra_id
+         JOIN caminhoes c ON c.id = a.caminhao_id
+        WHERE c.lote_id = $1
+        ORDER BY cp.idade, cp.id`,
+      [l.id]
+    );
+    ensaios.push({
+      lote: l,
+      corpos_prova: cps.map((c) => ({
+        identificacao: c.identificacao,
+        idade: c.idade,
+        resultado: c.resultado != null ? Number(c.resultado) : null,
+        situacao: c.situacao,
+        numero_nota: c.numero_nota,
+        placa: c.placa,
+        caminhao_recusado: !!c.recusado,
+        fora_do_prazo: !!c.fora_do_prazo,
+      })),
+    });
+  }
+
+  res.json({
+    peca: {
+      id: peca.id,
+      identificacao: peca.identificacao,
+      pavimento: peca.pavimento,
+      obra: peca.obra,
+    },
+    lotes_e_ensaios: ensaios,
+  });
+}));
+
 
 module.exports = router;

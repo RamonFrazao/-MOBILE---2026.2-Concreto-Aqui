@@ -28,9 +28,15 @@ async function main() {
       `INSERT INTO usuarios (username, senha_hash, perfil, nome, construtora_id) VALUES ($1,$2,$3,$4,$5)`,
       ['tecnico', senhaHash, 'obra', 'Técnico no canteiro', construtoraA.id]
     );
+    const { rows: [labA] } = await client.query(
+      `INSERT INTO laboratorios (construtora_id, nome, cnpj, contato)
+       VALUES ($1, $2, $3, $4) RETURNING id`,
+      [construtoraA.id, 'Lab Tecnológico Bom Conselho', '12345678000199', 'lab@bomconselho.test']
+    );
     await client.query(
-      `INSERT INTO usuarios (username, senha_hash, perfil, nome, construtora_id) VALUES ($1,$2,$3,$4,$5)`,
-      ['lab', senhaHash, 'laboratorio', 'Laboratorista', construtoraA.id]
+      `INSERT INTO usuarios (username, senha_hash, perfil, nome, construtora_id, laboratorio_id)
+       VALUES ($1,$2,$3,$4,$5,$6)`,
+      ['lab', senhaHash, 'laboratorio', 'Laboratorista', construtoraA.id, labA.id]
     );
 
     const { rows: [classeA] } = await client.query(

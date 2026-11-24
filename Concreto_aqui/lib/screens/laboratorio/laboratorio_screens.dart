@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../data/mock_db.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/shared_widgets.dart';
+import '../shared/corpo_prova_screens.dart';
+import '../../services/amostras_repository.dart';
 
 const _accent = AppColors.accentLaboratorio;
 
@@ -37,8 +39,26 @@ class HomeLaboratorioScreen extends StatelessWidget {
             subtitulo: '${_pendentes()} exemplar(es) pendente(s)',
             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LabListaScreen())),
           ),
+          MenuRow(
+            titulo: 'Consultar por identificação',
+            subtitulo: 'CP-AAAA-NNNNN → peça, lote, caminhão e nota',
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const ConsultaCorpoProvaScreen(accent: _accent),
+              ),
+            ),
+          ),
+          MenuRow(
+            titulo: 'Remessas recebidas',
+            subtitulo: 'Corpos de prova enviados pela obra',
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const LabRemessasScreen()),
+            ),
+          ),
           const NoteText(
-              'O laboratório só lança o resultado do rompimento — não decide a aceitação do lote. Este perfil não tem, e nunca vai ter, acesso a pedido, lote ou aceitação: é a única tela que existe aqui.'),
+              'O laboratório só lança o resultado do rompimento — não decide a aceitação do lote. A consulta pela identificação do corpo de prova está disponível para localizar a peça de origem.'),
         ],
       ),
     );
@@ -191,6 +211,333 @@ class _LabLancarScreenState extends State<LabLancarScreen> {
           Navigator.pop(context);
         },
       ),
+    );
+  }
+}
+
+
+class LabRemessasScreen extends StatefulWidget {
+  const LabRemessasScreen({super.key});
+
+  @override
+  State<LabRemessasScreen> createState() => _LabRemessasScreenState();
+}
+
+class _LabRemessasScreenState extends State<LabRemessasScreen> {
+  final _repo = AmostrasRepository();
+  bool _loading = true;
+  String? _erro;
+  List<Map<String, dynamic>> _itens = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _carregar();
+  }
+
+  Future<void> _carregar() async {
+    setState(() {
+      _loading = true;
+      _erro = null;
+    });
+    final r = await _repo.listarRemessas();
+    if (!mounted) return;
+    setState(() {
+      _loading = false;
+      if (r.ok) {
+        _itens = r.dados ?? [];
+      } else {
+        _erro = r.erro;
+      }
+    });
+  }
+
+  Future<void> _receber(int id) async {
+    final r = await _repo.receberRemessa(id);
+    if (!mounted) return;
+    if (r.ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Remessa recebida. Corpos de prova no laboratório.')),
+      );
+      _carregar();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(r.erro ?? 'Erro')));
+    }
+  }
+
+
+  Future<void> _abrirRemessa(Map<String, dynamic> r) async {
+    final id = r['id'] as int;
+    if (r['status'] == 'enviada') {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Receber remessa?'),
+          content: Text('Confirmar recebimento da remessa #$id no laboratório.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Voltar')),
+            TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Receber')),
+          ],
+        ),
+      );
+      if (ok == true) await _receber(id);
+    }
+    final det = await _repo.buscarRemessa(id);
+    if (!mounted) return;
+    if (!det.ok) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(det.erro ?? 'Erro')));
+      return;
+    }
+    final corpos = (det.dados?['corpos_prova'] as List?) ?? [];
+    if (corpos.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Remessa sem corpos de prova.')),
+      );
+      return;
+    }
+    await showModalBottomSheet(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const ListTile(title: Text('Corpos da remessa')),
+            for (final c in corpos)
+              ListTile(
+                title: Text('${c['identificacao']} · ${c['idade']} dias'),
+                subtitle: Text(c['resultado'] != null ? '${c['resultado']} MPa' : (c['situacao'] as String? ?? '')),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => LancarResultadoScreen(corpoProvaId: c['id'] as int),
+                    ),
+                  ).then((_) => _carregar());
+                },
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AppShell(
+      title: 'Remessas',
+      accent: _accent,
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : _erro != null
+              ? AppBanner(titulo: 'Erro', texto: _erro!, tom: BannerTom.vermelho)
+              : _itens.isEmpty
+                  ? const Text('Nenhuma remessa disponível.', style: TextStyle(color: AppColors.inkSoft))
+                  : Column(
+                      children: [
+
+                        for (final r in _itens)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: MenuRow(
+                              titulo: 'Remessa #${r['id']} · ${r['status']}',
+                              subtitulo:
+                                  '${r['qtd_corpos'] ?? 0} corpo(s) · ${r['enviada_em'] ?? ''}',
+                              onTap: () => _abrirRemessa(r),
+                            ),
+                          ),
+                      ],
+                    ),
+    );
+  }
+}
+
+
+class LancarResultadoScreen extends StatefulWidget {
+  final int corpoProvaId;
+  const LancarResultadoScreen({super.key, required this.corpoProvaId});
+
+  @override
+  State<LancarResultadoScreen> createState() => _LancarResultadoScreenState();
+}
+
+class _LancarResultadoScreenState extends State<LancarResultadoScreen> {
+  final _repo = AmostrasRepository();
+  final _mpaCtrl = TextEditingController();
+  final _motivoCtrl = TextEditingController();
+  bool _loading = true;
+  bool _salvando = false;
+  String? _erro;
+  Map<String, dynamic>? _dados;
+  DateTime _rompidoEm = DateTime.now();
+
+  @override
+  void initState() {
+    super.initState();
+    _carregar();
+  }
+
+  @override
+  void dispose() {
+    _mpaCtrl.dispose();
+    _motivoCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _carregar() async {
+    setState(() {
+      _loading = true;
+      _erro = null;
+    });
+    final r = await _repo.corpoParaRompimento(widget.corpoProvaId);
+    if (!mounted) return;
+    setState(() {
+      _loading = false;
+      if (r.ok) {
+        _dados = r.dados;
+      } else {
+        _erro = r.erro;
+      }
+    });
+  }
+
+  Future<void> _salvar() async {
+    final mpa = num.tryParse(_mpaCtrl.text.trim().replaceAll(',', '.'));
+    if (mpa == null || mpa <= 0) {
+      setState(() => _erro = 'Informe a resistência em MPa.');
+      return;
+    }
+    final temResultado = _dados?['resultado_vigente'] != null;
+    if (temResultado && _motivoCtrl.text.trim().length < 3) {
+      setState(() => _erro = 'Correção exige motivo (novo lançamento, sem apagar o anterior).');
+      return;
+    }
+    setState(() {
+      _salvando = true;
+      _erro = null;
+    });
+    final r = await _repo.lancarResultado(
+      corpoProvaId: widget.corpoProvaId,
+      rompidoEm: _rompidoEm,
+      resistenciaMpa: mpa,
+      idadeRealDias: (_dados?['idade_real_sugerida_dias'] as num?),
+      motivoCorrecao: temResultado ? _motivoCtrl.text.trim() : null,
+    );
+    if (!mounted) return;
+    setState(() => _salvando = false);
+    if (r.ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Resultado gravado. A obra verá ao sincronizar.')),
+      );
+      Navigator.pop(context, true);
+    } else {
+      setState(() => _erro = r.erro);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final d = _dados;
+    final hist = (d?['historico'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    return AppShell(
+      title: 'Lançar rompimento',
+      accent: _accent,
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : d == null
+              ? AppBanner(titulo: 'Erro', texto: _erro ?? 'Falha ao carregar', tom: BannerTom.vermelho)
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(d['identificacao'] as String? ?? '—',
+                        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Idade nominal: ${d['idade_nominal']} dias · '
+                      'Idade real sugerida: ${d['idade_real_sugerida_dias'] ?? '—'} dias '
+                      '(a partir da moldagem ${d['moldado_em'] ?? '—'})',
+                      style: const TextStyle(fontSize: 12.5, color: AppColors.inkSoft),
+                    ),
+                    Text(
+                      'Lote ${d['lote_numero'] ?? '—'} · Nota ${d['numero_nota'] ?? '—'} · ${d['placa'] ?? ''}',
+                      style: const TextStyle(fontSize: 12.5, color: AppColors.inkSoft),
+                    ),
+                    if (d['resultado_vigente'] != null) ...[
+                      const SizedBox(height: 8),
+                      AppBanner(
+                        titulo: 'Já existe resultado (${d['resultado_vigente']} MPa)',
+                        texto: 'A correção será um novo lançamento, com motivo, sem apagar o anterior.',
+                        tom: BannerTom.ambar,
+                      ),
+                    ],
+                    const SizedBox(height: 14),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Data/hora do rompimento'),
+                      subtitle: Text(_rompidoEm.toLocal().toString()),
+                      trailing: const Icon(Icons.event),
+                      onTap: () async {
+                        final data = await showDatePicker(
+                          context: context,
+                          initialDate: _rompidoEm,
+                          firstDate: DateTime(2020),
+                          lastDate: DateTime(2100),
+                        );
+                        if (data == null || !mounted) return;
+                        final hora = await showTimePicker(
+                          context: context,
+                          initialTime: TimeOfDay.fromDateTime(_rompidoEm),
+                        );
+                        if (hora == null || !mounted) return;
+                        setState(() {
+                          _rompidoEm = DateTime(data.year, data.month, data.day, hora.hour, hora.minute);
+                        });
+                      },
+                    ),
+                    TextField(
+                      controller: _mpaCtrl,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      decoration: const InputDecoration(
+                        labelText: 'Resistência (MPa)',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    if (d['resultado_vigente'] != null) ...[
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: _motivoCtrl,
+                        maxLines: 2,
+                        decoration: const InputDecoration(
+                          labelText: 'Motivo da correção',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                    ],
+                    if (_erro != null) ...[
+                      const SizedBox(height: 8),
+                      Text(_erro!, style: const TextStyle(color: AppColors.red)),
+                    ],
+                    const SizedBox(height: 12),
+                    PrimaryButton(
+                      texto: _salvando ? 'Gravando…' : 'Gravar resultado',
+                      onPressed: _salvando ? null : _salvar,
+                    ),
+                    if (hist.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      const Text('Histórico de lançamentos',
+                          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
+                      for (final h in hist)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 6),
+                          child: Text(
+                            '${h['resistencia_mpa']} MPa · idade real ${h['idade_real_dias']} d · ${h['rompido_em']}'
+                            '${h['motivo_correcao'] != null ? ' · correção: ${h['motivo_correcao']}' : ''}',
+                            style: const TextStyle(fontSize: 12, color: AppColors.inkSoft),
+                          ),
+                        ),
+                    ],
+                  ],
+                ),
     );
   }
 }

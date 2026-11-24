@@ -35,7 +35,13 @@ router.post('/login', async (req, res) => {
     }
 
     const token = jwt.sign(
-      { sub: usuario.id, perfil: usuario.perfil, construtoraId: usuario.construtora_id },
+      {
+        sub: usuario.id,
+        id: usuario.id,
+        perfil: usuario.perfil,
+        construtoraId: usuario.construtora_id,
+        laboratorioId: usuario.laboratorio_id || null,
+      },
       JWT_SECRET,
       { expiresIn: '30d' }
     );
@@ -47,6 +53,7 @@ router.post('/login', async (req, res) => {
         perfil: usuario.perfil,
         nome: usuario.nome,
         construtora: usuario.construtora_nome,
+        laboratorio_id: usuario.laboratorio_id || null,
       },
     });
   } catch (err) {

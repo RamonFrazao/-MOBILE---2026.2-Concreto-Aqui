@@ -9,6 +9,10 @@ const centraisRoutes = require('./routes/centrais');
 const laboratoriosRoutes = require('./routes/laboratorios');
 const classesRoutes = require('./routes/classes');
 const pedidosRoutes = require('./routes/pedidos');
+const caminhoesRoutes = require('./routes/caminhoes');
+const configuracoesRoutes = require('./routes/configuracoes');
+const amostrasRoutes = require('./routes/amostras');
+const remessasRoutes = require('./routes/remessas');
 
 const app = express();
 app.use(cors());
@@ -21,6 +25,10 @@ app.use('/centrais', centraisRoutes);
 app.use('/laboratorios', laboratoriosRoutes);
 app.use('/classes', classesRoutes);
 app.use('/pedidos', pedidosRoutes);
+app.use('/caminhoes', caminhoesRoutes);
+app.use('/configuracoes', configuracoesRoutes);
+app.use('/amostras', amostrasRoutes);
+app.use('/remessas', remessasRoutes);
 
 app.get('/', (req, res) => res.json({ ok: true, servico: 'Concreto Aqui API' }));
 

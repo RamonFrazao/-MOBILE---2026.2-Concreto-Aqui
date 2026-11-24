@@ -31,6 +31,11 @@ class LoteResumo {
   final String dataConcretagem; // AAAA-MM-DD
   final int qtdPecas;
   final int qtdCaminhoes;
+
+  /// Caminhões do lote que ficaram fora do prazo de descarga.
+  final int qtdForaDoPrazo;
+  /// Quantas amostras já foram coletadas neste lote.
+  final int qtdAmostras;
   final num volumeTotal;
 
   const LoteResumo({
@@ -43,6 +48,8 @@ class LoteResumo {
     required this.dataConcretagem,
     required this.qtdPecas,
     required this.qtdCaminhoes,
+    required this.qtdForaDoPrazo,
+    required this.qtdAmostras,
     required this.volumeTotal,
   });
 
@@ -58,6 +65,8 @@ class LoteResumo {
         dataConcretagem: j['data_concretagem'] as String,
         qtdPecas: (j['qtd_pecas'] as int?) ?? 0,
         qtdCaminhoes: (j['qtd_caminhoes'] as int?) ?? 0,
+        qtdForaDoPrazo: (j['qtd_fora_do_prazo'] as int?) ?? 0,
+        qtdAmostras: (j['qtd_amostras'] as int?) ?? 0,
         volumeTotal: (j['volume_total'] as num?) ?? 0,
       );
 }
@@ -94,6 +103,10 @@ class CaminhaoDoLote {
   final int? pedidoNumero;
   final DateTime criadoEm;
 
+  /// Situação do prazo de descarga (nula nos caminhões do desenho antigo).
+  final String? situacaoPrazo;
+  final bool foraDoPrazo;
+
   const CaminhaoDoLote({
     required this.id,
     required this.placa,
@@ -101,6 +114,8 @@ class CaminhaoDoLote {
     required this.centralNome,
     required this.pedidoNumero,
     required this.criadoEm,
+    required this.situacaoPrazo,
+    required this.foraDoPrazo,
   });
 
   factory CaminhaoDoLote.fromJson(Map<String, dynamic> j) => CaminhaoDoLote(
@@ -110,6 +125,8 @@ class CaminhaoDoLote {
         centralNome: j['central_nome'] as String,
         pedidoNumero: j['pedido_numero'] as int?,
         criadoEm: DateTime.parse(j['criado_em'] as String).toLocal(),
+        situacaoPrazo: j['situacao_prazo'] as String?,
+        foraDoPrazo: (j['fora_do_prazo'] as bool?) ?? false,
       );
 }
 
@@ -124,6 +141,11 @@ class LoteCompleto {
   final List<PecaDoLote> pecas;
   final List<CaminhaoDoLote> caminhoes;
   final int qtdCaminhoes;
+
+  /// Caminhões do lote que ficaram fora do prazo de descarga.
+  final int qtdForaDoPrazo;
+  /// Quantas amostras já foram coletadas neste lote.
+  final int qtdAmostras;
   final num volumeTotal;
 
   const LoteCompleto({
@@ -136,6 +158,8 @@ class LoteCompleto {
     required this.pecas,
     required this.caminhoes,
     required this.qtdCaminhoes,
+    required this.qtdForaDoPrazo,
+    required this.qtdAmostras,
     required this.volumeTotal,
   });
 
@@ -152,6 +176,8 @@ class LoteCompleto {
         pecas: (j['pecas'] as List).map((e) => PecaDoLote.fromJson(e as Map<String, dynamic>)).toList(),
         caminhoes: (j['caminhoes'] as List).map((e) => CaminhaoDoLote.fromJson(e as Map<String, dynamic>)).toList(),
         qtdCaminhoes: (j['qtd_caminhoes'] as int?) ?? 0,
+        qtdForaDoPrazo: (j['qtd_fora_do_prazo'] as int?) ?? 0,
+        qtdAmostras: (j['qtd_amostras'] as int?) ?? 0,
         volumeTotal: (j['volume_total'] as num?) ?? 0,
       );
 }
@@ -338,5 +364,81 @@ class LotesApiRepository {
     final r = await _chamar('DELETE', '/lotes/$id');
     if (!r.ok) return LotesResultado.falha(r.erro!);
     return const LotesResultado.sucesso(true);
+  }
+
+  /// Exemplares do lote (cálculo no servidor: maior valor, nunca a média).
+  Future<LotesResultado<Map<String, dynamic>>> exemplaresDoLote(int loteId) async {
+    final r = await _chamar('GET', '/lotes/$loteId/exemplares');
+    if (!r.ok) return LotesResultado.falha(r.erro!);
+    try {
+      return LotesResultado.sucesso(r.dados as Map<String, dynamic>);
+    } catch (_) {
+      return const LotesResultado.falha('Resposta inesperada do servidor.');
+    }
+  }
+
+  Future<LotesResultado<Map<String, dynamic>>> aceitacaoDoLote(int loteId) async {
+    final r = await _chamar('GET', '/lotes/$loteId/aceitacao');
+    if (!r.ok) return LotesResultado.falha(r.erro!);
+    try {
+      return LotesResultado.sucesso(r.dados as Map<String, dynamic>);
+    } catch (_) {
+      return const LotesResultado.falha('Resposta inesperada do servidor.');
+    }
+  }
+
+  Future<LotesResultado<Map<String, dynamic>>> confirmarAceitacao(
+    int loteId, {
+    String? decisao,
+    String? detalhe,
+  }) async {
+    final r = await _chamar(
+      'POST',
+      '/lotes/$loteId/aceitacao',
+      corpo: {
+        if (decisao != null) 'decisao': decisao,
+        if (detalhe != null) 'detalhe': detalhe,
+      },
+    );
+    if (!r.ok) return LotesResultado.falha(r.erro!);
+    try {
+      return LotesResultado.sucesso(r.dados as Map<String, dynamic>);
+    } catch (_) {
+      return const LotesResultado.falha('Resposta inesperada do servidor.');
+    }
+  }
+
+  Future<LotesResultado<Map<String, dynamic>>> definirCondicaoPreparo(int loteId, String condicao) async {
+    final r = await _chamar(
+      'PUT',
+      '/lotes/$loteId/condicao-preparo',
+      corpo: {'condicao_preparo': condicao},
+    );
+    if (!r.ok) return LotesResultado.falha(r.erro!);
+    try {
+      return LotesResultado.sucesso(r.dados as Map<String, dynamic>);
+    } catch (_) {
+      return const LotesResultado.falha('Resposta inesperada do servidor.');
+    }
+  }
+
+  Future<LotesResultado<Map<String, dynamic>>> relatorioDoLote(int loteId) async {
+    final r = await _chamar('GET', '/lotes/$loteId/relatorio');
+    if (!r.ok) return LotesResultado.falha(r.erro!);
+    try {
+      return LotesResultado.sucesso(r.dados as Map<String, dynamic>);
+    } catch (_) {
+      return const LotesResultado.falha('Resposta inesperada do servidor.');
+    }
+  }
+
+  Future<LotesResultado<Map<String, dynamic>>> rastreabilidadePeca(int pecaId) async {
+    final r = await _chamar('GET', '/lotes/rastreabilidade/peca/$pecaId');
+    if (!r.ok) return LotesResultado.falha(r.erro!);
+    try {
+      return LotesResultado.sucesso(r.dados as Map<String, dynamic>);
+    } catch (_) {
+      return const LotesResultado.falha('Resposta inesperada do servidor.');
+    }
   }
 }

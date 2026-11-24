@@ -4,6 +4,9 @@ import '../../data/mock_db.dart';
 import '../../models/domain_models.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/shared_widgets.dart';
+import '../shared/corpo_prova_screens.dart';
+import 'fila_offline_screen.dart';
+import '../../services/fila_offline.dart';
 
 const _accent = AppColors.accentObra;
 
@@ -26,8 +29,29 @@ class HomeObraScreen extends StatelessWidget {
             subtitulo: '$abertos lote(s) aguardando',
             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ObraLotesScreen())),
           ),
-          const NoteText(
-              'O técnico da obra recebe o caminhão, confere a nota, faz o ensaio de abatimento, molda os corpos de prova e envia ao laboratório. Não altera resultado de ensaio — isso é só do laboratório.'),
+          MenuRow(
+            titulo: 'Consultar corpo de prova',
+            subtitulo: 'Pela identificação até a peça',
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const ConsultaCorpoProvaScreen(accent: _accent),
+              ),
+            ),
+          ),
+          ListenableBuilder(
+            listenable: FilaOffline.instance,
+            builder: (context, _) => MenuRow(
+              titulo: 'Fila offline',
+              subtitulo: FilaOffline.instance.pendentes == 0
+                  ? 'Nenhum item pendente'
+                  : '${FilaOffline.instance.pendentes} item(ns) pendente(s) de envio',
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const FilaOfflineScreen()),
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -190,7 +214,6 @@ class _Janela90ScreenState extends State<Janela90Screen> {
               ],
             ),
           ),
-          const NoteText('O prazo estourado fica marcado no registro — não é apagado, mesmo que a descarga continue.'),
         ],
       ),
       footer: PrimaryButton(
@@ -254,7 +277,6 @@ class _SlumpScreenState extends State<SlumpScreen> {
           ),
           const SizedBox(height: 12),
           if (resultado != null) resultado,
-          const NoteText('Fora da tolerância, o caminhão volta para a central — não se corrige com água no canteiro.'),
         ],
       ),
       footer: PrimaryButton(
@@ -371,7 +393,6 @@ class EnvioLabScreen extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           AppBanner(titulo: 'Corpos de prova moldados', texto: 'Identificados e rastreados até ${l.peca}.'),
-          const NoteText('Ao enviar, os corpos de prova entram na fila do laboratório e o lote passa a aguardar os resultados do rompimento.'),
         ],
       ),
       footer: PrimaryButton(

@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../services/lotes_api_repository.dart';
+import 'exemplares_screens.dart';
+import 'aceitacao_screens.dart';
+import 'relatorio_screens.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/shared_widgets.dart';
 
@@ -125,8 +128,7 @@ class _LotesListaScreenState extends State<LotesListaScreen> {
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const NoteText(
-              'O lote é a unidade de julgamento: reúne as peças concretadas na mesma condição e guarda o fck de projeto. A aceitação é do lote, nunca de um caminhão isolado.'),
+          
           const SizedBox(height: 10),
           PrimaryButton(texto: 'Abrir lote', onPressed: _abrir),
           const SizedBox(height: 12),
@@ -156,6 +158,9 @@ class _LoteTile extends StatelessWidget {
     final l = lote;
     final pecas = l.qtdPecas == 1 ? '1 peça' : '${l.qtdPecas} peças';
     final caminhoes = l.qtdCaminhoes == 1 ? '1 caminhão' : '${l.qtdCaminhoes} caminhões';
+    final amostras = l.qtdAmostras == 0
+        ? 'nenhuma amostra'
+        : (l.qtdAmostras == 1 ? '1 amostra' : '${l.qtdAmostras} amostras');
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
@@ -198,9 +203,18 @@ class _LoteTile extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  '$pecas · $caminhoes · ${_fmtVolume(l.volumeTotal)} m³',
+                  '$pecas · $caminhoes · $amostras · ${_fmtVolume(l.volumeTotal)} m³',
                   style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
                 ),
+                if (l.qtdForaDoPrazo > 0) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    l.qtdForaDoPrazo == 1
+                        ? '1 caminhão fora do prazo de descarga'
+                        : '${l.qtdForaDoPrazo} caminhões fora do prazo de descarga',
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.red),
+                  ),
+                ],
               ],
             ),
           ),
@@ -533,7 +547,38 @@ class _LoteAcompanhamentoScreenState extends State<LoteAcompanhamentoScreen> {
                   ),
                 )),
 
-            _Titulo('Caminhões recebidos (${l.qtdCaminhoes})'),
+            _Titulo('Caminhões recebidos (${l.qtdCaminhoes}) · Amostras (${l.qtdAmostras})'),
+            const SizedBox(height: 8),
+            MenuRow(
+              titulo: 'Exemplares do lote',
+              subtitulo: 'Por amostra e idade',
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => ExemplaresLoteScreen(loteId: l.id, loteNumero: l.numero),
+                ),
+              ),
+            ),
+            MenuRow(
+              titulo: 'Aceitação do lote',
+              subtitulo: 'fck,est e fck de projeto',
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => AceitacaoLoteScreen(loteId: l.id, loteNumero: l.numero),
+                ),
+              ),
+            ),
+            MenuRow(
+              titulo: 'Relatório de controle',
+              subtitulo: 'Para fiscalização e cliente',
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => RelatorioLoteScreen(loteId: l.id, loteNumero: l.numero),
+                ),
+              ),
+            ),
             Container(
               width: double.infinity,
               margin: const EdgeInsets.only(bottom: 8),
@@ -547,12 +592,20 @@ class _LoteAcompanhamentoScreenState extends State<LoteAcompanhamentoScreen> {
                 style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: Color(0xFF245A3E)),
               ),
             ),
+            if (l.qtdForaDoPrazo > 0)
+              AppBanner(
+                titulo: l.qtdForaDoPrazo == 1
+                    ? '1 caminhão fora do prazo de descarga'
+                    : '${l.qtdForaDoPrazo} caminhões fora do prazo de descarga',
+                texto: 'Continuam no lote e contam no volume total; o relatório de prazo mostra os detalhes.',
+                tom: BannerTom.vermelho,
+              ),
             if (l.caminhoes.isEmpty) const NoteText('Nenhum caminhão recebido ainda.'),
             ...l.caminhoes.map((c) => Container(
                   margin: const EdgeInsets.only(bottom: 6),
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                   decoration: BoxDecoration(
-                    border: Border.all(color: AppColors.line),
+                    border: Border.all(color: c.foraDoPrazo ? AppColors.red : AppColors.line),
                     borderRadius: BorderRadius.circular(9),
                   ),
                   child: Column(
@@ -566,6 +619,11 @@ class _LoteAcompanhamentoScreenState extends State<LoteAcompanhamentoScreen> {
                               style: const TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.w700, fontSize: 13),
                             ),
                           ),
+                          if (c.foraDoPrazo)
+                            const Padding(
+                              padding: EdgeInsets.only(right: 8),
+                              child: StatusBadge(texto: 'fora do prazo', cor: AppColors.red, fundo: AppColors.redSoft),
+                            ),
                           Text(
                             c.volume == null ? 'volume não informado' : '${_fmtVolume(c.volume!)} m³',
                             style: const TextStyle(fontFamily: 'monospace', fontSize: 12.5),

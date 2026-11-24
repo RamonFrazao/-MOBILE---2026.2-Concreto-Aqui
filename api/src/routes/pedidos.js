@@ -32,6 +32,26 @@ function numero(v) {
   return null;
 }
 
+// Data e hora de verdade: só aceita o formato ISO COM fuso (Z ou +hh:mm),
+// para o servidor nunca interpretar a hora no fuso dele em vez do da obra.
+// O calendário é conferido à parte: o parser do JavaScript aceita
+// "2026-02-31" e o transforma em 03/03 sem avisar (e "24:00" vira o dia
+// seguinte).
+const ISO = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?(Z|[+-](\d{2}):(\d{2}))$/;
+function instante(v) {
+  if (typeof v !== 'string') return null;
+  const m = ISO.exec(v.trim());
+  if (!m) return null;
+  const [ano, mes, dia, hora, minuto] = [m[1], m[2], m[3], m[4], m[5]].map(Number);
+  const segundo = m[6] === undefined ? 0 : Number(m[6]);
+  const diasNoMes = new Date(Date.UTC(ano, mes, 0)).getUTCDate();
+  if (ano < 2000 || ano > 2100 || mes < 1 || mes > 12 || dia < 1 || dia > diasNoMes) return null;
+  if (hora > 23 || minuto > 59 || segundo > 59) return null;
+  if (m[8] !== undefined && (Number(m[8]) > 23 || Number(m[9]) > 59)) return null;
+  const d = new Date(v.trim());
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
 // Um pedido por linha, já com tudo que a tela precisa: obra, peça,
 // central, classe e o volume entregue (soma dos caminhões que já
 // chegaram para ele).
@@ -171,9 +191,11 @@ router.post('/', rota(async (req, res) => {
     return res.status(400).json({ erro: `O volume pedido não pode passar de ${VOLUME_MAXIMO} m³.` });
   }
 
-  const prevista = new Date(corpo.prevista_para);
-  if (Number.isNaN(prevista.getTime()) || prevista.getFullYear() < 2000 || prevista.getFullYear() > 2100) {
-    return res.status(400).json({ erro: 'Data e hora previstas inválidas.' });
+  const prevista = instante(corpo.prevista_para);
+  if (!prevista) {
+    return res.status(400).json({
+      erro: 'Data e hora previstas inválidas (use o formato ISO com fuso, ex.: 2026-10-20T08:00:00-03:00).',
+    });
   }
 
   // Central, classe e peça precisam existir e ser desta construtora.
