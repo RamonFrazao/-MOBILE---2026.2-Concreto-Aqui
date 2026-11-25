@@ -268,7 +268,8 @@ class AmostrasRepository {
     } catch (_) {
       return const AmostrasResultado.falha('Resposta inesperada do servidor.');
     }
-  
+  }
+
   Future<AmostrasResultado<Map<String, dynamic>>> corpoParaRompimento(int corpoProvaId) async {
     final r = await _chamar('GET', '/remessas/corpos-prova/$corpoProvaId/para-rompimento');
     if (!r.ok) return AmostrasResultado.falha(r.erro!);

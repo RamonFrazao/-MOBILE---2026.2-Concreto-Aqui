@@ -125,6 +125,25 @@ class _CadeiaCard extends StatelessWidget {
 
   const _CadeiaCard({required this.cadeia, required this.onCompartilhar});
 
+  static String _rotuloSituacao(String? s) {
+    switch (s) {
+      case 'moldado':
+        return 'moldado';
+      case 'em_cura':
+        return 'em cura';
+      case 'em_remessa':
+        return 'em remessa';
+      case 'no_laboratorio':
+        return 'no laboratório';
+      case 'rompido':
+        return 'rompido';
+      case 'descartado':
+        return 'descartado';
+      default:
+        return s ?? '—';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final cp = cadeia['corpo_prova'] as Map<String, dynamic>? ?? {};
