@@ -139,16 +139,8 @@ class _LoginScreenState extends State<LoginScreen> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'A senha é conferida no servidor, nunca no aparelho — e o erro não diz se o usuário existe ou se foi a senha.',
-                    style: TextStyle(color: Color(0xFFAAB4C4), fontSize: 11.5, height: 1.5),
-                  ),
-                  const SizedBox(height: 14),
-                  const Text(
-                    'Perfis de teste: construtora · tecnico · lab — senha 1234',
-                    style: TextStyle(color: Color(0xFFAAB4C4), fontSize: 11.5, height: 1.5),
-                  ),
+                  
+                  
                 ],
               ),
             ),
