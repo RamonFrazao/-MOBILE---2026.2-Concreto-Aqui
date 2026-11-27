@@ -1,34 +1,52 @@
-# Concreto Aqui — projeto completo
+# Concreto Aqui
 
-Duas pastas:
+Controle tecnológico do concreto, do caminhão até a peça.
 
-- **`api/`** — API em Node + Express + PostgreSQL. Resolve a T01 de
-  verdade: login com senha cifrada (bcrypt), erro genérico, token de
-  sessão (JWT) e a recusa de dados de outra construtora.
-- **`concreto_aqui/`** — app Flutter. Fala com a API para login e para a
-  busca de lote por código; o restante das telas (obras, pedidos,
-  moldagem, laboratório etc.) ainda roda sobre dados mock em memória —
-  isso é trabalho de E2/E3, documentado no README de dentro da pasta.
+O técnico registra a descarga com a hora de verdade. O laboratório lança o rompimento sem julgar a estrutura. A construtora vê o exemplar, o `fck,est` e o relatório que se mostra à fiscalização — inclusive o caminhão recusado e o que descarregou fora do prazo.
 
-## Ordem para rodar
+## O problema
 
-1. Suba a API primeiro — siga `api/README.md` (criar o banco, rodar o
-   schema, rodar o seed, `npm start`).
-2. Depois rode o app Flutter — siga `concreto_aqui/README.md`.
+Na obra, o resultado do concreto se perde entre a nota fiscal, o papel do corpo de prova e a planilha do lote.
 
-## Perfis de teste (após o seed da API)
+- A hora da descarga anotada depois não serve para apurar o prazo.
+- O laudo devolve um número em MPa e não diz de qual pilar ele saiu.
+- A média dos dois corpos de prova muda a aceitação. A norma manda usar o maior.
+- Canteiro sem sinal não pode esperar a internet para guardar a hora.
 
-| Perfil       | Usuário       | Senha |
-|--------------|---------------|-------|
-| Construtora  | `construtora` | 1234  |
-| Obra         | `tecnico`     | 1234  |
-| Laboratório  | `lab`         | 1234  |
+## O que o sistema faz
 
-Para testar a recusa entre construtoras: logado como `construtora`, na
-tela "Pedidos e lotes", busque o código `19/07` (lote de outra
-construtora, criado só para esse teste) — a API responde `403 Acesso
-negado`.
+| Quem | O que registra |
+|---|---|
+| Técnico da obra | Caminhão, início e fim da descarga, abatimento, moldagem, cura e remessa |
+| Laboratório | Data do rompimento, idade real em dias e resistência em MPa |
+| Construtora | Exemplares, `fck,est`, aceitação do lote e relatório |
 
-Um protótipo navegável em HTML das mesmas telas (usado para validar o
-fluxo na E1, antes da API existir) está em
-`concreto_aqui/concreto-aqui-prototipo.html`.
+Regras que o servidor aplica, e que a planilha costuma errar:
+
+- O prazo fecha na **hora de fim** da descarga, com o relógio do servidor.
+- Cada corpo de prova recebe uma identificação que não se repete na obra (`CP-AAAA-NNNNN`).
+- Dois corpos da mesma amostra e da mesma idade formam um **exemplar**. O resultado é o **maior** dos dois, não a média.
+- Corpo rompido aos 30 dias não vira ensaio de 28. A idade real fica gravada.
+- O `fck,est` sai dos exemplares de 28 dias, pela amostragem parcial da NBR 12655, e é comparado com o `fck` de projeto. O resultado de 7 dias é alerta, não julgamento.
+- Lote reprovado não condena a estrutura. O sistema registra a decisão do engenheiro.
+- Sem rede, o lançamento fica no aparelho com um identificador próprio. Enviar duas vezes não cria dois registros.
+- O relatório do lote mostra recusados e fora do prazo. Eles não são omitidos.
+
+O laboratório não vê e não altera pedido, lote nem aceitação.
+
+## Stack
+
+- **App:** Flutter (obra, laboratório e construtora no mesmo aplicativo)
+- **API:** Node.js e Express
+- **Banco:** PostgreSQL
+- **Sessão:** JWT, com permissão por perfil
+
+## Como rodar
+
+Pré-requisitos: Node.js 18+, PostgreSQL, Flutter.
+
+### 1. Banco e API
+
+```bash
+cd "Projeto Mobile/api"
+npm install
