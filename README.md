@@ -16,13 +16,7 @@ Duas pastas:
    schema, rodar o seed, `npm start`).
 2. Depois rode o app Flutter — siga `concreto_aqui/README.md`.
 
-## Perfis de teste (após o seed da API)
 
-| Perfil       | Usuário       | Senha |
-|--------------|---------------|-------|
-| Construtora  | `construtora` | 1234  |
-| Obra         | `tecnico`     | 1234  |
-| Laboratório  | `lab`         | 1234  |
 
 Para testar a recusa entre construtoras: logado como `construtora`, na
 tela "Pedidos e lotes", busque o código `19/07` (lote de outra
